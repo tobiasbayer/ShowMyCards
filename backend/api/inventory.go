@@ -97,6 +97,7 @@ type CreateInventoryRequest struct {
 	ScryfallID        string `json:"scryfall_id"`
 	OracleID          string `json:"oracle_id"`
 	Treatment         string `json:"treatment,omitempty"`
+	Language          string `json:"language,omitempty"`
 	Quantity          int    `json:"quantity"`
 	StorageLocationID *uint  `json:"storage_location_id,omitempty"`
 }
@@ -149,6 +150,7 @@ func (h *InventoryHandler) Create(c fiber.Ctx) error {
 		ScryfallID:        req.ScryfallID,
 		OracleID:          req.OracleID,
 		Treatment:         req.Treatment,
+		Language:          req.Language,
 		Quantity:          req.Quantity,
 		StorageLocationID: req.StorageLocationID,
 	}
@@ -172,6 +174,7 @@ type UpdateInventoryRequest struct {
 	ScryfallID        *string `json:"scryfall_id,omitempty"`
 	OracleID          *string `json:"oracle_id,omitempty"`
 	Treatment         *string `json:"treatment,omitempty"`
+	Language          *string `json:"language,omitempty"`
 	Quantity          *int    `json:"quantity,omitempty"`
 	StorageLocationID *uint   `json:"storage_location_id,omitempty"`
 	ClearStorage      bool    `json:"clear_storage,omitempty"`
@@ -199,7 +202,7 @@ func (h *InventoryHandler) Update(c fiber.Ctx) error {
 	}
 
 	if req.ScryfallID == nil && req.OracleID == nil && req.Treatment == nil &&
-		req.Quantity == nil && req.StorageLocationID == nil && !req.ClearStorage {
+		req.Language == nil && req.Quantity == nil && req.StorageLocationID == nil && !req.ClearStorage {
 		return utils.ReturnError(c, fiber.StatusBadRequest, "at least one field must be provided for update")
 	}
 
@@ -212,6 +215,9 @@ func (h *InventoryHandler) Update(c fiber.Ctx) error {
 	}
 	if req.Treatment != nil {
 		item.Treatment = *req.Treatment
+	}
+	if req.Language != nil {
+		item.Language = *req.Language
 	}
 	if req.Quantity != nil {
 		item.Quantity = *req.Quantity
@@ -334,15 +340,28 @@ func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
 			"Failed to fetch inventory items", "database query failed", err)
 	}
 
-	// Group by Scryfall ID to fetch card data
+	// Group by (Scryfall ID, Language) so different-language copies of the same
+	// printing render as separate stacks, while still fetching one Scryfall card
+	// per scryfall_id.
+	type groupKey struct {
+		ScryfallID string
+		Language   string
+	}
+	groupKeys := make([]groupKey, 0)
+	inventoryMap := make(map[groupKey][]models.Inventory)
 	scryfallIDs := make([]string, 0)
-	inventoryMap := make(map[string][]models.Inventory)
+	seenScryfallID := make(map[string]bool)
 
 	for _, item := range inventoryItems {
-		if _, exists := inventoryMap[item.ScryfallID]; !exists {
+		key := groupKey{ScryfallID: item.ScryfallID, Language: item.Language}
+		if _, exists := inventoryMap[key]; !exists {
+			groupKeys = append(groupKeys, key)
+		}
+		inventoryMap[key] = append(inventoryMap[key], item)
+		if !seenScryfallID[item.ScryfallID] {
+			seenScryfallID[item.ScryfallID] = true
 			scryfallIDs = append(scryfallIDs, item.ScryfallID)
 		}
-		inventoryMap[item.ScryfallID] = append(inventoryMap[item.ScryfallID], item)
 	}
 
 	// Fetch and parse card data
@@ -353,14 +372,14 @@ func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
 	}
 
 	// Build enhanced card results using card data
-	enhancedResults := make([]EnhancedCardResult, 0, len(scryfallIDs))
-	for _, scryfallID := range scryfallIDs {
-		scryfallCard, found := scryfallCardMap[scryfallID]
+	enhancedResults := make([]EnhancedCardResult, 0, len(groupKeys))
+	for _, key := range groupKeys {
+		scryfallCard, found := scryfallCardMap[key.ScryfallID]
 		if !found {
 			continue
 		}
 
-		enhancedCard := buildEnhancedCardResult(scryfallCard, inventoryMap[scryfallID])
+		enhancedCard := buildEnhancedCardResult(scryfallCard, inventoryMap[key])
 		enhancedResults = append(enhancedResults, enhancedCard)
 	}
 
@@ -381,6 +400,7 @@ func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
 type ExistingPrintingInfo struct {
 	ScryfallID      string                  `json:"scryfall_id"`
 	Treatment       string                  `json:"treatment"`
+	Language        string                  `json:"language"`
 	Quantity        int                     `json:"quantity"`
 	StorageLocation *models.StorageLocation `json:"storage_location,omitempty"`
 }
@@ -416,6 +436,7 @@ func (h *InventoryHandler) ByOracle(c fiber.Ctx) error {
 		printings = append(printings, ExistingPrintingInfo{
 			ScryfallID:      item.ScryfallID,
 			Treatment:       item.Treatment,
+			Language:        item.Language,
 			Quantity:        item.Quantity,
 			StorageLocation: item.StorageLocation,
 		})
