@@ -1558,7 +1558,7 @@ func TestListAsCards_CardNotInCardsTable(t *testing.T) {
 		t.Fatalf("failed to decode response: %v", err)
 	}
 
-	// total_cards counts inventory items (2), but data only includes those with card records (1)
+	// total_cards counts stacks (2), but data only includes those with card records (1)
 	if len(result.Data) != 1 {
 		t.Errorf("expected 1 card in data (missing card skipped), got %d", len(result.Data))
 	}
@@ -1597,6 +1597,74 @@ func TestListAsCards_MultipleInventoryPerCard(t *testing.T) {
 	}
 	if len(card.Inventory.ThisPrinting) != 2 {
 		t.Errorf("expected 2 items in this_printing, got %d", len(card.Inventory.ThisPrinting))
+	}
+}
+
+// Regression: pagination must page over stacks, not inventory rows. Otherwise a
+// stack with multiple rows can be split across pages, producing duplicate stack
+// entries that crash the keyed {#each} on the frontend.
+func TestListAsCards_StackNotSplitAcrossPages(t *testing.T) {
+	app, db := setupFullInventoryTestApp(t)
+
+	createTestCard(t, db, "card-a", "Card A", "tst", "common", "1.00")
+	createTestCard(t, db, "card-b", "Card B", "tst", "common", "1.00")
+
+	// Stack A has 3 rows (foil, nonfoil, etched), stack B has 1.
+	// With page_size=2 and the old row-based pagination, A's rows would have
+	// straddled the page boundary.
+	db.Create(&models.Inventory{ScryfallID: "card-a", OracleID: "oracle-a", Treatment: "nonfoil", Language: "en", Quantity: 1})
+	db.Create(&models.Inventory{ScryfallID: "card-a", OracleID: "oracle-a", Treatment: "foil", Language: "en", Quantity: 1})
+	db.Create(&models.Inventory{ScryfallID: "card-a", OracleID: "oracle-a", Treatment: "etched", Language: "en", Quantity: 1})
+	db.Create(&models.Inventory{ScryfallID: "card-b", OracleID: "oracle-b", Treatment: "nonfoil", Language: "en", Quantity: 1})
+
+	req := httptest.NewRequest(http.MethodGet, "/inventory/cards?page=1&page_size=2", nil)
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var page1 InventoryCardsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&page1); err != nil {
+		t.Fatalf("failed to decode page 1: %v", err)
+	}
+
+	if page1.TotalCards != 2 {
+		t.Errorf("expected total_cards 2 (one per stack), got %d", page1.TotalCards)
+	}
+	if page1.TotalPages != 1 {
+		t.Errorf("expected total_pages 1 (2 stacks fit in page_size 2), got %d", page1.TotalPages)
+	}
+	if len(page1.Data) != 2 {
+		t.Fatalf("expected 2 stacks on page 1, got %d", len(page1.Data))
+	}
+
+	// Each stack must be whole — no stack should appear in two responses with
+	// its rows split. Stack A must have all 3 rows in one entry.
+	for _, card := range page1.Data {
+		if card.ID == "card-a" {
+			if len(card.Inventory.ThisPrinting) != 3 {
+				t.Errorf("expected 3 rows in stack A, got %d", len(card.Inventory.ThisPrinting))
+			}
+			if card.Inventory.TotalQuantity != 3 {
+				t.Errorf("expected total_quantity 3 in stack A, got %d", card.Inventory.TotalQuantity)
+			}
+		}
+	}
+
+	// Concatenating all pages must not yield two entries with the same
+	// (scryfall_id, language) — the duplicate-key trigger on the frontend.
+	seen := map[string]bool{}
+	for _, card := range page1.Data {
+		lang := ""
+		if len(card.Inventory.ThisPrinting) > 0 {
+			lang = card.Inventory.ThisPrinting[0].Language
+		}
+		key := card.ID + ":" + lang
+		if seen[key] {
+			t.Errorf("duplicate stack key %q across pagination", key)
+		}
+		seen[key] = true
 	}
 }
 

@@ -302,89 +302,121 @@ func buildEnhancedCardResult(scryfallCard scryfall.Card, inventoryItems []models
 	}
 }
 
-// ListAsCards returns inventory items as enhanced card results (like search)
+// ListAsCards returns inventory items as enhanced card results (like search).
+//
+// Pagination is over stacks — unique (scryfall_id, language) combinations —
+// rather than individual inventory rows. A single stack can contain multiple
+// inventory rows (e.g. foil + nonfoil of the same printing in the same
+// location); paginating by rows would split a stack across pages.
 func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
-	// Parse query params (using smaller max page size for card results)
 	params := utils.ParsePaginationParams(c, utils.DefaultPageSize, DefaultCardsPageSize)
 
 	locationID := c.Query("storage_location_id")
 
-	// Build query
-	query := h.db.WithContext(c.RequestCtx()).Model(&models.Inventory{})
-	if locationID == "null" {
-		query = query.Where("storage_location_id IS NULL")
-	} else if locationID != "" {
+	db := h.db.WithContext(c.RequestCtx())
+	baseFilter := func() *gorm.DB {
+		q := db.Model(&models.Inventory{})
+		if locationID == "null" {
+			q = q.Where("storage_location_id IS NULL")
+		} else if locationID != "" {
+			q = q.Where("storage_location_id = ?", locationID)
+		}
+		return q
+	}
+
+	if locationID != "" && locationID != "null" {
 		if err := utils.ValidateNumericParam(locationID, "storage_location_id"); err != nil {
 			return utils.ReturnError(c, fiber.StatusBadRequest, err.Error())
 		}
-		query = query.Where("storage_location_id = ?", locationID)
 	}
 
-	// Count total
+	// Count distinct stacks
 	var total int64
-	if err := query.Count(&total).Error; err != nil {
+	stacksSubQuery := baseFilter().
+		Select("scryfall_id, language").
+		Group("scryfall_id, language")
+	if err := db.Table("(?) as stacks", stacksSubQuery).Count(&total).Error; err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
-			"Failed to count inventory items", "count query failed", err)
+			"Failed to count inventory stacks", "count query failed", err)
 	}
 
-	// Get paginated inventory items
-	var inventoryItems []models.Inventory
+	// Fetch a page of stack keys, ordered by most-recently-added inventory row
+	// in the stack. Tiebreakers keep ordering deterministic across pages.
+	type stackKey struct {
+		ScryfallID string
+		Language   string
+	}
+	var stackKeys []stackKey
 	offset := utils.CalculateOffset(params.Page, params.PageSize)
-	if err := query.
-		Preload("StorageLocation").
-		Order("created_at DESC").
+	if err := baseFilter().
+		Select("scryfall_id, language, MAX(created_at) as last_added").
+		Group("scryfall_id, language").
+		Order("last_added DESC, scryfall_id ASC, language ASC").
 		Limit(params.PageSize).
 		Offset(offset).
+		Find(&stackKeys).Error; err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to fetch inventory stacks", "stack query failed", err)
+	}
+
+	totalPages := utils.CalculateTotalPages(total, params.PageSize)
+	if len(stackKeys) == 0 {
+		return c.JSON(InventoryCardsResponse{
+			Data:       []EnhancedCardResult{},
+			Page:       params.Page,
+			PageSize:   params.PageSize,
+			TotalCards: int(total),
+			TotalPages: totalPages,
+		})
+	}
+
+	// Fetch all inventory rows for the stacks on this page in one query.
+	tuples := make([][]any, 0, len(stackKeys))
+	scryfallIDs := make([]string, 0, len(stackKeys))
+	seenScryfallID := make(map[string]bool)
+	for _, k := range stackKeys {
+		tuples = append(tuples, []any{k.ScryfallID, k.Language})
+		if !seenScryfallID[k.ScryfallID] {
+			seenScryfallID[k.ScryfallID] = true
+			scryfallIDs = append(scryfallIDs, k.ScryfallID)
+		}
+	}
+
+	var inventoryItems []models.Inventory
+	if err := baseFilter().
+		Preload("StorageLocation").
+		Where("(scryfall_id, language) IN ?", tuples).
+		Order("created_at DESC").
 		Find(&inventoryItems).Error; err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to fetch inventory items", "database query failed", err)
 	}
 
-	// Group by (Scryfall ID, Language) so different-language copies of the same
-	// printing render as separate stacks, while still fetching one Scryfall card
-	// per scryfall_id.
-	type groupKey struct {
-		ScryfallID string
-		Language   string
-	}
-	groupKeys := make([]groupKey, 0)
-	inventoryMap := make(map[groupKey][]models.Inventory)
-	scryfallIDs := make([]string, 0)
-	seenScryfallID := make(map[string]bool)
-
+	inventoryMap := make(map[stackKey][]models.Inventory, len(stackKeys))
 	for _, item := range inventoryItems {
-		key := groupKey{ScryfallID: item.ScryfallID, Language: item.Language}
-		if _, exists := inventoryMap[key]; !exists {
-			groupKeys = append(groupKeys, key)
-		}
-		inventoryMap[key] = append(inventoryMap[key], item)
-		if !seenScryfallID[item.ScryfallID] {
-			seenScryfallID[item.ScryfallID] = true
-			scryfallIDs = append(scryfallIDs, item.ScryfallID)
-		}
+		k := stackKey{ScryfallID: item.ScryfallID, Language: item.Language}
+		inventoryMap[k] = append(inventoryMap[k], item)
 	}
 
-	// Fetch and parse card data
-	scryfallCardMap, err := models.GetScryfallCardsByIDs(h.db.WithContext(c.RequestCtx()), scryfallIDs)
+	scryfallCardMap, err := models.GetScryfallCardsByIDs(db, scryfallIDs)
 	if err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to fetch card data", "cards query failed", err)
 	}
 
-	// Build enhanced card results using card data
-	enhancedResults := make([]EnhancedCardResult, 0, len(groupKeys))
-	for _, key := range groupKeys {
-		scryfallCard, found := scryfallCardMap[key.ScryfallID]
+	// Build results in the page's stack order so pagination is stable.
+	enhancedResults := make([]EnhancedCardResult, 0, len(stackKeys))
+	for _, k := range stackKeys {
+		scryfallCard, found := scryfallCardMap[k.ScryfallID]
 		if !found {
 			continue
 		}
-
-		enhancedCard := buildEnhancedCardResult(scryfallCard, inventoryMap[key])
-		enhancedResults = append(enhancedResults, enhancedCard)
+		items := inventoryMap[k]
+		if len(items) == 0 {
+			continue
+		}
+		enhancedResults = append(enhancedResults, buildEnhancedCardResult(scryfallCard, items))
 	}
-
-	// Calculate total pages
-	totalPages := utils.CalculateTotalPages(total, params.PageSize)
 
 	return c.JSON(InventoryCardsResponse{
 		Data:       enhancedResults,
