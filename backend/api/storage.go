@@ -258,7 +258,7 @@ func (h *StorageHandler) ListWithCounts(c fiber.Ctx) error {
 
 		for _, item := range inventoryByLocation[location.ID] {
 			if scryfallCard, ok := scryfallCardMap[item.ScryfallID]; ok {
-				price := utils.ParsePriceFromScryfall(scryfallCard.Prices, item.Treatment)
+				price := utils.ParsePriceFromScryfall(scryfallCard.Prices, item.Treatment, utils.CurrencyUSD)
 				totalValue += price * float64(item.Quantity)
 			}
 		}

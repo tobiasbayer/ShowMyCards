@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { resolve } from '$app/paths';
-	import { PageHeader, StatsCard, notifications } from '$lib';
+	import { PageHeader, StatsCard, notifications, currency } from '$lib';
 	import type { PageData } from './$types';
 	import {
 		Search,
@@ -25,6 +25,11 @@
 		}
 	});
 
+	function fmtMoney(usd: number, eur: number): string {
+		const value = currency.current === 'eur' ? eur : usd;
+		return `${currency.symbol}${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+	}
+
 	const stats = $derived([
 		{
 			title: 'Total Cards',
@@ -34,7 +39,7 @@
 		},
 		{
 			title: 'Collection Value',
-			value: `$${(data?.stats?.total_collection_value ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+			value: fmtMoney(data?.stats?.total_collection_value ?? 0, data?.stats?.total_collection_value_eur ?? 0),
 			description: 'Total inventory value',
 			valueClass: 'text-success'
 		},
@@ -52,13 +57,13 @@
 		},
 		{
 			title: 'Collected Value',
-			value: `$${(data?.stats?.total_collected_from_lists ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+			value: fmtMoney(data?.stats?.total_collected_from_lists ?? 0, data?.stats?.total_collected_from_lists_eur ?? 0),
 			description: 'From wishlists',
 			valueClass: 'text-info'
 		},
 		{
 			title: 'Remaining Value',
-			value: `$${(data?.stats?.total_remaining_lists_value ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+			value: fmtMoney(data?.stats?.total_remaining_lists_value ?? 0, data?.stats?.total_remaining_lists_value_eur ?? 0),
 			description: 'Still needed',
 			valueClass: 'text-warning'
 		},

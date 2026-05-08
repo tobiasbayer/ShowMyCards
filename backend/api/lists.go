@@ -381,7 +381,7 @@ func (h *ListHandler) calculateListValue(ctx context.Context, listID uint) (coll
 		if err != nil {
 			continue
 		}
-		price := utils.ParsePriceFromScryfall(scryfallCard.Prices, item.Treatment)
+		price := utils.ParsePriceFromScryfall(scryfallCard.Prices, item.Treatment, utils.CurrencyUSD)
 		collectedValue += price * float64(item.CollectedQuantity)
 		remaining := item.DesiredQuantity - item.CollectedQuantity
 		if remaining > 0 {
@@ -436,7 +436,7 @@ func (h *ListHandler) enrichListItems(ctx context.Context, listID uint, page, pa
 			enrichedItem.SetCode = scryfallCard.Set
 			enrichedItem.CollectorNumber = scryfallCard.CollectorNumber
 			enrichedItem.Rarity = string(scryfallCard.Rarity)
-			enrichedItem.CurrentPrice = utils.ParsePriceFromScryfall(scryfallCard.Prices, item.Treatment)
+			enrichedItem.CurrentPrice = utils.ParsePriceFromScryfall(scryfallCard.Prices, item.Treatment, utils.CurrencyUSD)
 			enrichedItem.Finishes = utils.ConvertEnumSliceToStrings(scryfallCard.Finishes)
 			enrichedItem.FrameEffects = utils.ConvertEnumSliceToStrings(scryfallCard.FrameEffects)
 			enrichedItem.PromoTypes = scryfallCard.PromoTypes

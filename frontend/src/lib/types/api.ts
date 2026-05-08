@@ -53,15 +53,20 @@ export const DefaultJobRetentionDays = 30;
  */
 export interface DashboardHandler {}
 /**
- * DashboardStats represents the statistics for the dashboard
+ * DashboardStats represents the statistics for the dashboard.
+ * Monetary fields are returned in both USD and EUR; the frontend displays
+ * the one matching the user's currency preference.
  * tygo:export
  */
 export interface DashboardStats {
 	total_inventory_cards: number /* int64 */; // Sum of inventory.quantity
 	total_wishlist_cards: number /* int64 */; // Sum of list_item.collected_quantity
-	total_collection_value: number /* float64 */; // Value from inventory
-	total_collected_from_lists: number /* float64 */; // Value of cards collected from lists
-	total_remaining_lists_value: number /* float64 */; // Value of cards still needed from lists
+	total_collection_value: number /* float64 */; // USD value of inventory
+	total_collection_value_eur: number /* float64 */; // EUR value of inventory
+	total_collected_from_lists: number /* float64 */; // USD value of cards collected from lists
+	total_collected_from_lists_eur: number /* float64 */; // EUR value of cards collected from lists
+	total_remaining_lists_value: number /* float64 */; // USD value of cards still needed from lists
+	total_remaining_lists_value_eur: number /* float64 */; // EUR value of cards still needed from lists
 	total_storage_locations: number /* int64 */;
 	total_lists: number /* int64 */;
 	unassigned_cards: number /* int64 */;
