@@ -170,7 +170,11 @@
 		<!-- Grid View -->
 		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
 			{#each paginatedCards as card (stackKey(card))}
-				<CardResultCard {card} onremove={() => handleRemove(stackKey(card))} selectable />
+				<CardResultCard
+					{card}
+					onremove={() => handleRemove(stackKey(card))}
+					selectable
+					showStorageLocations={false} />
 			{/each}
 		</div>
 	{:else}

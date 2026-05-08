@@ -2,6 +2,8 @@
 	import { browser } from '$app/environment';
 	import { enhance, deserialize } from '$app/forms';
 	import { resolve } from '$app/paths';
+	import { SvelteMap } from 'svelte/reactivity';
+	import type { StorageType } from '$lib/types/models';
 	import type { ActionData, PageData } from './$types';
 	import {
 		AddLanguageToggle,
@@ -19,8 +21,9 @@
 		usePersistedViewMode,
 		type EnhancedCardResult
 	} from '$lib';
-	import { Search, Lightbulb } from '@lucide/svelte';
+	import { Search, Lightbulb, Box, BookOpen } from '@lucide/svelte';
 	import SetIcon from '$lib/components/SetIcon.svelte';
+	import type { Inventory } from '$lib';
 
 	let { form, data }: { form: ActionData; data: PageData } = $props();
 
@@ -35,11 +38,17 @@
 
 	// Client-side filtering state
 	let filterText = $state('');
+	let inventoryOnly = $state(false);
 	const PAGE_SIZE = 24;
 	let currentPage = $state(1);
 
 	function handleSearchChange(text: string) {
 		filterText = text;
+		currentPage = 1;
+	}
+
+	function handleInventoryOnlyChange(value: boolean) {
+		inventoryOnly = value;
 		currentPage = 1;
 	}
 
@@ -107,6 +116,10 @@
 	function filterCards(cardsList: EnhancedCardResult[]): EnhancedCardResult[] {
 		let filtered = cardsList.filter((c) => !removedCardIds.has(c.id));
 
+		if (inventoryOnly) {
+			filtered = filtered.filter((card) => card.inventory.total_quantity > 0);
+		}
+
 		if (filterText.trim()) {
 			const search = filterText.toLowerCase().trim();
 			filtered = filtered.filter((card) => {
@@ -143,6 +156,32 @@
 	 */
 	function getPrimaryTreatment(card: EnhancedCardResult): string {
 		return card.finishes[0] || 'nonfoil';
+	}
+
+	/**
+	 * Group inventory items by storage location, summing quantities. Items without
+	 * a storage location are skipped.
+	 */
+	type StorageGroup = { id: number; name: string; storage_type: StorageType; quantity: number };
+
+	function getStorageGroups(items: Inventory[]): StorageGroup[] {
+		const map = new SvelteMap<number, StorageGroup>();
+		for (const inv of items) {
+			if (!inv.storage_location || inv.storage_location_id === undefined) continue;
+			const id = inv.storage_location_id;
+			const existing = map.get(id);
+			if (existing) {
+				existing.quantity += inv.quantity;
+			} else {
+				map.set(id, {
+					id,
+					name: inv.storage_location.name,
+					storage_type: inv.storage_location.storage_type,
+					quantity: inv.quantity
+				});
+			}
+		}
+		return [...map.values()];
 	}
 </script>
 
@@ -209,19 +248,29 @@
 		<!-- Filter bar -->
 		<div class="flex flex-col gap-4 mb-4">
 			<div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-				<CardFilter
-					searchText={filterText}
-					onSearchChange={handleSearchChange}
-					showStatusFilter={false}
-					placeholder="Filter results by name, set, or treatment..." />
+				<div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+					<CardFilter
+						searchText={filterText}
+						onSearchChange={handleSearchChange}
+						showStatusFilter={false}
+						placeholder="Filter results by name, set, or treatment..." />
+					<label class="label cursor-pointer gap-2">
+						<input
+							type="checkbox"
+							class="checkbox checkbox-primary checkbox-sm"
+							checked={inventoryOnly}
+							onchange={(e) => handleInventoryOnlyChange(e.currentTarget.checked)} />
+						<span class="label-text whitespace-nowrap">In my inventory</span>
+					</label>
+				</div>
 				<div class="flex items-center gap-2">
 					<AddLanguageToggle />
 					<ViewToggle viewMode={view.viewMode} onViewModeChange={view.setViewMode} />
 				</div>
 			</div>
-			{#if filterText || totalFilteredPages > 1}
+			{#if filterText || inventoryOnly || totalFilteredPages > 1}
 				<div class="text-sm opacity-70">
-					{#if filterText}
+					{#if filterText || inventoryOnly}
 						Showing {filteredCards.length} of {cards.length} cards
 					{/if}
 					{#if totalFilteredPages > 1}
@@ -264,6 +313,7 @@
 								{@const primaryTreatment = getPrimaryTreatment(card)}
 								{@const isFoil = isFoilTreatment(primaryTreatment)}
 								{@const totalQty = card.inventory.total_quantity}
+								{@const storageGroups = getStorageGroups(card.inventory.this_printing)}
 								<tr class="hover:bg-base-300">
 									<td>
 										<a href={resolve(`/cards/${card.id}`)} class="font-semibold hover:text-primary">
@@ -295,7 +345,26 @@
 									</td>
 									<td>
 										{#if totalQty > 0}
-											<span class="badge badge-primary">{totalQty}</span>
+											<div class="flex flex-col gap-1 items-start">
+												<span class="badge badge-primary">{totalQty}</span>
+												{#if storageGroups.length > 0}
+													<div class="flex flex-wrap gap-1">
+														{#each storageGroups as group (group.id)}
+															<span
+																class="badge badge-outline badge-sm gap-1"
+																title={group.name}>
+																{#if group.storage_type === 'Box'}
+																	<Box class="w-3 h-3 text-primary" />
+																{:else}
+																	<BookOpen class="w-3 h-3 text-secondary" />
+																{/if}
+																<span class="truncate max-w-[8rem]">{group.name}</span>
+																<span class="opacity-70">×{group.quantity}</span>
+															</span>
+														{/each}
+													</div>
+												{/if}
+											</div>
 										{:else}
 											<span class="opacity-50">-</span>
 										{/if}

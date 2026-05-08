@@ -16,18 +16,21 @@
 	import TreatmentBadge from './TreatmentBadge.svelte';
 	import { deserialize } from '$app/forms';
 	import { resolve } from '$app/paths';
+	import { Box, BookOpen } from '@lucide/svelte';
 	import type { ByOracleResponse, ExistingPrintingInfo } from '$lib/types/api';
 
 	let {
 		card,
 		onremove,
 		storageLocations = [],
-		selectable = false
+		selectable = false,
+		showStorageLocations = true
 	}: {
 		card: EnhancedCardResult;
 		onremove?: (cardId: string) => void;
 		storageLocations?: StorageLocation[];
 		selectable?: boolean;
+		showStorageLocations?: boolean;
 	} = $props();
 
 	// Selected storage location for manual override (default to auto)
@@ -69,6 +72,28 @@
 	// printing the user owns in both EN and DE will yield two badges. No inventory
 	// → no badges (avoids implying ownership of a language the user doesn't have).
 	const cardLanguages = $derived([...new Set(inventory.map((i) => i.language || 'en'))]);
+
+	// Storage locations where the user owns this printing, with summed quantities.
+	type StorageGroup = { id: number; name: string; storage_type: string; quantity: number };
+	const storageGroups = $derived.by(() => {
+		const map = new SvelteMap<number, StorageGroup>();
+		for (const inv of inventory) {
+			if (!inv.storage_location || inv.storage_location_id === undefined) continue;
+			const id = inv.storage_location_id;
+			const existing = map.get(id);
+			if (existing) {
+				existing.quantity += inv.quantity;
+			} else {
+				map.set(id, {
+					id,
+					name: inv.storage_location.name,
+					storage_type: inv.storage_location.storage_type,
+					quantity: inv.quantity
+				});
+			}
+		}
+		return [...map.values()];
+	});
 
 	// Check if there are existing printings in different locations
 	async function checkForExistingPrintings(treatment: string): Promise<boolean> {
@@ -366,14 +391,31 @@
 			{/if}
 		</div>
 
+		<!-- Storage locations where this printing is owned -->
+		{#if showStorageLocations && storageGroups.length > 0}
+			<div class="flex flex-wrap gap-1 mb-2">
+				{#each storageGroups as group (group.id)}
+					<span class="badge badge-outline badge-sm gap-1" title={group.name}>
+						{#if group.storage_type === 'Box'}
+							<Box class="w-3 h-3 text-primary" />
+						{:else}
+							<BookOpen class="w-3 h-3 text-secondary" />
+						{/if}
+						<span class="truncate max-w-[8rem]">{group.name}</span>
+						<span class="opacity-70">×{group.quantity}</span>
+					</span>
+				{/each}
+			</div>
+		{/if}
+
 		<!-- Storage location override dropdown -->
 		{#if storageLocations.length > 0}
 			<div class="mb-2">
 				<StorageLocationDropdown
-					locations={storageLocations}
-					selected={selectedStorageLocation}
-					onchange={(v) => (selectedStorageLocation = v)}
-					compact />
+						locations={storageLocations}
+						selected={selectedStorageLocation}
+						onchange={(v) => (selectedStorageLocation = v)}
+						compact />
 			</div>
 		{/if}
 
