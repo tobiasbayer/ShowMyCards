@@ -29,7 +29,8 @@
 		selectable = false,
 		readOnly = false,
 		showLocations = false,
-		onSplitMove
+		onSplitMove,
+		deck
 	}: {
 		card: EnhancedCardResult;
 		onremove?: (cardId: string) => void;
@@ -38,6 +39,8 @@
 		readOnly?: boolean;
 		showLocations?: boolean;
 		onSplitMove?: (inv: Inventory, available: number) => void;
+		/** Optional deck-availability summary; renders a "free for decks" indicator when set. */
+		deck?: { owned: number; decked: number; free: number };
 	} = $props();
 
 	// Selected storage location for manual override (default to auto)
@@ -399,6 +402,19 @@
 				</div>
 			{/if}
 		</div>
+
+		{#if deck}
+			<div
+				class="mb-2 flex items-center gap-2 text-xs"
+				title="Copies not committed to any deck (finish is not yet part of this count)">
+				<span class="badge badge-sm {deck.free > 0 ? 'badge-success' : 'badge-ghost'}">
+					{deck.free} free for decks
+				</span>
+				{#if deck.decked > 0}
+					<span class="opacity-60">{deck.decked} decked</span>
+				{/if}
+			</div>
+		{/if}
 
 		<!-- Storage location override dropdown -->
 		{#if !readOnly && storageLocations.length > 0}
