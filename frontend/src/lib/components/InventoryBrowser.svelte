@@ -423,7 +423,7 @@
 	{/if}
 
 	{#if !readOnly}
-		<BulkActionsBar locations={allLocations} onComplete={handleBulkComplete} />
+		<BulkActionsBar locations={allLocations} {cards} onComplete={handleBulkComplete} />
 
 		<SplitMoveModal
 			open={!!moveTarget}
