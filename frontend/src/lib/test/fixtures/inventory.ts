@@ -1,4 +1,4 @@
-import type { EnhancedCardResult, Inventory } from '$lib';
+import type { Inventory, InventoryCard } from '$lib';
 
 export function inventoryItem(id: number, overrides: Partial<Inventory> = {}): Inventory {
 	return {
@@ -16,8 +16,9 @@ export function inventoryItem(id: number, overrides: Partial<Inventory> = {}): I
 export function inventoryCard(
 	id: string,
 	items: Inventory[],
-	overrides: Partial<EnhancedCardResult> = {}
-): EnhancedCardResult {
+	overrides: Partial<InventoryCard> = {}
+): InventoryCard {
+	const total = items.reduce((sum, item) => sum + item.quantity, 0);
 	return {
 		id,
 		oracle_id: 'oracle-1',
@@ -31,8 +32,9 @@ export function inventoryCard(
 		inventory: {
 			this_printing: items,
 			other_printings: [],
-			total_quantity: items.reduce((total, item) => total + item.quantity, 0)
+			total_quantity: total
 		},
+		deck: { owned: total, decked: 0, free: total },
 		...overrides
 	};
 }
