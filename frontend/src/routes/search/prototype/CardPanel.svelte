@@ -266,7 +266,7 @@
 {/snippet}
 
 {#snippet inDecks()}
-	{#if decks && decks.length > 0}
+	{#if decks}
 		<section>
 			<div class="mb-1 flex items-center">
 				<h3 class="section-title">In decks</h3>
@@ -274,23 +274,22 @@
 					<Plus class="size-3.5" /> Add to deck
 				</button>
 			</div>
-			<ul class="divide-y divide-base-200">
-				{#each decks as d (`${d.deck_id}-${d.zone}-${d.scryfall_id}-${d.treatment}`)}
-					<li class="flex items-center gap-2 py-1.5 text-sm">
-						<a
-							href={resolve('/decks/[id]', { id: String(d.deck_id) })}
-							class="link-hover min-w-0 flex-1 truncate"
-							>{d.deck_name}{#if d.zone !== 'main'}<span class="text-base-content/45">
-									· {d.zone}</span
-								>{/if}</a>
-						<span class="shrink-0 tabular-nums text-base-content/60">{d.desired_quantity}×</span>
-					</li>
-				{/each}
-			</ul>
+			{#if decks.length > 0}
+				<ul class="divide-y divide-base-200">
+					{#each decks as d (`${d.deck_id}-${d.zone}-${d.scryfall_id}-${d.treatment}`)}
+						<li class="flex items-center gap-2 py-1.5 text-sm">
+							<a
+								href={resolve('/decks/[id]', { id: String(d.deck_id) })}
+								class="link-hover min-w-0 flex-1 truncate"
+								>{d.deck_name}{#if d.zone !== 'main'}<span class="text-base-content/45">
+										· {d.zone}</span
+									>{/if}</a>
+							<span class="shrink-0 tabular-nums text-base-content/60">{d.desired_quantity}×</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
 		</section>
-	{:else if decks}
-		<button type="button" class="link link-hover text-sm text-base-content/50" onclick={addToDeck}
-			>Add to deck</button>
 	{/if}
 {/snippet}
 
