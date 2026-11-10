@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { DeckSummary, CreateDeckRequest } from '$lib';
+import type { DeckCardUsage, DeckSummary, CreateDeckRequest } from '$lib';
 
 /** A deck as returned by create (BaseModel fields flattened at runtime). */
 export interface CreatedDeck {
@@ -19,5 +19,9 @@ export const decksApi = {
 	list: () => apiClient.get<DeckSummary[]>('/decks'),
 
 	/** Create a new deck. */
-	create: (data: CreateDeckRequest) => apiClient.post<CreatedDeck>('/decks', data)
+	create: (data: CreateDeckRequest) => apiClient.post<CreatedDeck>('/decks', data),
+
+	/** Every deck item that uses a printing: any-printing items and items pinned to it. */
+	forCard: (scryfallId: string) =>
+		apiClient.get<DeckCardUsage[]>(`/decks/for-card/${encodeURIComponent(scryfallId)}`)
 };

@@ -1,7 +1,7 @@
 import { page } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import type { DeckSummary } from '$lib';
+import { notifications, type DeckAvailability, type DeckCardUsage, type DeckSummary } from '$lib';
 import AddToDeckModal from './AddToDeckModal.svelte';
 
 function deck(id: number, name: string): DeckSummary {
@@ -13,7 +13,8 @@ function deck(id: number, name: string): DeckSummary {
 		updated_at: '',
 		total_items: 0,
 		total_cards_demand: 0,
-		aggregate_shortfall: 0
+		aggregate_shortfall: 0,
+		aggregate_over_committed: 0
 	};
 }
 
@@ -21,8 +22,16 @@ const sol = { oracle_id: 'sol', scryfall_id: 'cmm-1', name: 'Sol Ring', copies: 
 
 let fetchSpy: MockInstance<typeof fetch>;
 
-/** Route the deck list (via the /api proxy) and the add endpoint to canned responses. */
-function mockBackend(decks: DeckSummary[]) {
+interface CopyInfo {
+	availability: DeckAvailability;
+	usage: DeckCardUsage[];
+}
+
+/**
+ * Route the deck list (via the /api proxy), the add endpoint and, when given,
+ * the card's availability and deck usage to canned responses.
+ */
+function mockBackend(decks: DeckSummary[], copyInfo?: CopyInfo) {
 	fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
 		const url = String(input);
 		if (url.endsWith('/api/decks')) {
@@ -31,8 +40,29 @@ function mockBackend(decks: DeckSummary[]) {
 		if (/\/decks\/\d+\/items$/.test(url)) {
 			return new Response(JSON.stringify({ success: true }), { status: 200 });
 		}
+		if (copyInfo && /\/api\/inventory\/availability\/[^/]+$/.test(url)) {
+			return new Response(JSON.stringify(copyInfo.availability), { status: 200 });
+		}
+		if (copyInfo && /\/api\/decks\/for-card\/[^/]+$/.test(url)) {
+			return new Response(JSON.stringify(copyInfo.usage), { status: 200 });
+		}
 		return new Response('not found', { status: 404 });
 	});
+}
+
+function usage(deckId: number, deckName: string): DeckCardUsage {
+	return {
+		deck_id: deckId,
+		deck_name: deckName,
+		zone: 'main',
+		desired_quantity: 1,
+		scryfall_id: '',
+		treatment: ''
+	};
+}
+
+function requested(fragment: string) {
+	return fetchSpy.mock.calls.some(([input]) => String(input).includes(fragment));
 }
 
 function postedItems() {
@@ -116,5 +146,114 @@ describe('AddToDeckModal', () => {
 		await expect.element(page.getByText('You have no decks yet')).toBeInTheDocument();
 		await expect.element(page.getByPlaceholder('New deck name')).toBeInTheDocument();
 		await expect.element(page.getByRole('button', { name: 'Add to deck' })).toBeDisabled();
+	});
+});
+
+describe('AddToDeckModal shared-copy notice', () => {
+	beforeEach(() => {
+		localStorage.clear();
+		notifications.clear();
+	});
+	afterEach(() => vi.restoreAllMocks());
+
+	// One copy owned and already wanted by Mono Red (deck 7).
+	const oneCopyInMonoRed: CopyInfo = {
+		availability: { owned: 1, decked: 1, free: 0 },
+		usage: [usage(7, 'Mono Red')]
+	};
+	const decks = [deck(7, 'Mono Red'), deck(9, 'Elves')];
+	const notice = /You own 1 copy and 1 is already in Mono Red\./;
+
+	it('warns when the only owned copy is already wanted by another deck', async () => {
+		mockBackend(decks, oneCopyInMonoRed);
+		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+
+		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
+
+		await expect.element(page.getByText(notice)).toBeInTheDocument();
+	});
+
+	it('does not warn when the chosen deck is the one that holds the card', async () => {
+		mockBackend(decks, oneCopyInMonoRed);
+		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+
+		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
+		await expect.element(page.getByText(notice)).toBeInTheDocument();
+
+		await page.getByLabelText('Deck', { exact: true }).selectOptions('7');
+		await expect.element(page.getByText(notice)).not.toBeInTheDocument();
+	});
+
+	it('does not warn for the maybe board, which commits no copies', async () => {
+		mockBackend(decks, oneCopyInMonoRed);
+		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+
+		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
+		await expect.element(page.getByText(notice)).toBeInTheDocument();
+
+		await page.getByRole('radio', { name: 'Maybe' }).click();
+		await expect.element(page.getByText(notice)).not.toBeInTheDocument();
+
+		await page.getByRole('radio', { name: 'Main' }).click();
+		await expect.element(page.getByText(notice)).toBeInTheDocument();
+	});
+
+	it('does not warn for a card the user does not own', async () => {
+		mockBackend(decks, {
+			availability: { owned: 0, decked: 0, free: 0 },
+			usage: [usage(7, 'Mono Red')]
+		});
+		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+
+		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
+		await vi.waitFor(() => expect(requested('/for-card/')).toBe(true));
+
+		await expect.element(page.getByText(/already in/)).not.toBeInTheDocument();
+	});
+
+	it('does not look anything up in bulk mode', async () => {
+		mockBackend(decks, oneCopyInMonoRed);
+		render(AddToDeckModal, {
+			open: true,
+			bulk: true,
+			cards: [{ ...sol, copies: 3 }],
+			onClose: vi.fn()
+		});
+
+		await expect.element(page.getByText('1 card · 3 copies selected')).toBeInTheDocument();
+		expect(requested('/inventory/availability/')).toBe(false);
+		expect(requested('/for-card/')).toBe(false);
+	});
+
+	it('still adds the card, with a warning toast naming the other deck', async () => {
+		mockBackend(decks, oneCopyInMonoRed);
+		const onAdded = vi.fn();
+		render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose: vi.fn() });
+
+		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
+		await expect.element(page.getByText(notice)).toBeInTheDocument();
+		await page.getByRole('button', { name: 'Add to deck' }).click();
+
+		await vi.waitFor(() => expect(onAdded).toHaveBeenCalledWith('Elves'));
+		const toast = notifications.notifications.at(-1);
+		expect(toast?.type).toBe('warning');
+		expect(toast?.message).toContain('Added Sol Ring to Elves (Main)');
+		expect(toast?.message).toContain('also wanted by Mono Red');
+	});
+
+	it('shows a plain success toast when nothing is shared', async () => {
+		mockBackend(decks, {
+			availability: { owned: 2, decked: 1, free: 1 },
+			usage: [usage(7, 'Mono Red')]
+		});
+		const onAdded = vi.fn();
+		render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose: vi.fn() });
+
+		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
+		await vi.waitFor(() => expect(requested('/for-card/')).toBe(true));
+		await page.getByRole('button', { name: 'Add to deck' }).click();
+
+		await vi.waitFor(() => expect(onAdded).toHaveBeenCalledWith('Elves'));
+		expect(notifications.notifications.at(-1)?.type).toBe('success');
 	});
 });

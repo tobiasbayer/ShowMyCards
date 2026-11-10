@@ -1,8 +1,22 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { decksApi, notifications, type DeckSummary, type DeckZone } from '$lib';
-	import { buildDeckItems, type AddToDeckCard } from '$lib/utils/deck-add';
-	import { LayersPlus, Plus } from '@lucide/svelte';
+	import {
+		decksApi,
+		inventoryApi,
+		notifications,
+		type DeckAvailability,
+		type DeckCardUsage,
+		type DeckSummary,
+		type DeckZone
+	} from '$lib';
+	import {
+		buildDeckItems,
+		sharedCopyAddedMessage,
+		sharedCopyMessage,
+		sharedCopyNotice,
+		type AddToDeckCard
+	} from '$lib/utils/deck-add';
+	import { Info, LayersPlus, Plus } from '@lucide/svelte';
 	import Modal from './Modal.svelte';
 
 	interface Props {
@@ -67,6 +81,42 @@
 		!!selectedDeck && cards.length > 0 && !saving && (bulk || (Number.isInteger(qty) && qty >= 1))
 	);
 
+	// Advisory only: how many copies of the card are free and which decks already
+	// want it. This depends on the card alone, so the notice below reacts to the
+	// chosen deck, zone and quantity without refetching. Single-card mode only.
+	let copyInfo = $state<{ availability: DeckAvailability; usage: DeckCardUsage[] } | null>(null);
+	const infoOracleId = $derived(open && single ? single.oracle_id : '');
+	const infoPrintingId = $derived(open && single ? single.scryfall_id : '');
+
+	$effect(() => {
+		const oracleId = infoOracleId;
+		const printingId = infoPrintingId;
+		copyInfo = null;
+		if (!oracleId || !printingId) return;
+
+		let stale = false;
+		Promise.all([inventoryApi.availability(oracleId), decksApi.forCard(printingId)])
+			.then(([availability, usage]) => {
+				if (!stale) copyInfo = { availability, usage };
+			})
+			.catch(() => {
+				// The notice is a courtesy: a failed lookup never blocks adding.
+			});
+		return () => {
+			stale = true;
+		};
+	});
+
+	const sharedCopies = $derived(
+		copyInfo && selectedDeck && Number.isInteger(qty) && qty >= 1
+			? sharedCopyNotice(copyInfo.availability, copyInfo.usage, {
+					deckId: selectedDeck.id,
+					zone,
+					quantity: qty
+				})
+			: null
+	);
+
 	async function loadDecks() {
 		loadState = 'loading';
 		try {
@@ -103,7 +153,8 @@
 					updated_at: '',
 					total_items: 0,
 					total_cards_demand: 0,
-					aggregate_shortfall: 0
+					aggregate_shortfall: 0,
+					aggregate_over_committed: 0
 				},
 				...decks
 			];
@@ -139,6 +190,9 @@
 		});
 		if (items.length === 0) return;
 
+		// Captured now: the notice follows the form, which may change while saving.
+		const sharedWith = sharedCopies;
+
 		saving = true;
 		try {
 			const response = await fetch(`/decks/${deck.id}/items`, {
@@ -153,11 +207,11 @@
 
 			rememberDeck(String(deck.id));
 			const zoneLabel = ZONES.find((z) => z.value === zone)?.label ?? zone;
-			notifications.success(
-				single
-					? `Added ${qty > 1 ? `${qty}× ` : ''}${single.name} to ${deck.name} (${zoneLabel})`
-					: `Added ${items.length} card${items.length === 1 ? '' : 's'} to ${deck.name} (${zoneLabel})`
-			);
+			const added = single
+				? `Added ${qty > 1 ? `${qty}× ` : ''}${single.name} to ${deck.name} (${zoneLabel})`
+				: `Added ${items.length} card${items.length === 1 ? '' : 's'} to ${deck.name} (${zoneLabel})`;
+			if (sharedWith) notifications.warning(sharedCopyAddedMessage(added, sharedWith));
+			else notifications.success(added);
 			onAdded?.(deck.name);
 			onClose();
 		} catch (err) {
@@ -312,6 +366,13 @@
 				</span>
 			</span>
 		</label>
+
+		{#if sharedCopies}
+			<div role="status" class="alert alert-info alert-soft py-2 text-sm">
+				<Info class="h-4 w-4 shrink-0" />
+				<span>{sharedCopyMessage(sharedCopies)}</span>
+			</div>
+		{/if}
 
 		<div class="modal-action">
 			<button type="button" class="btn btn-ghost" onclick={onClose}>Cancel</button>

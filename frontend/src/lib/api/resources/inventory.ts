@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { Inventory, InventoryCardsResponse } from '$lib';
+import type { DeckAvailability, Inventory, InventoryCardsResponse } from '$lib';
 import type {
 	BatchMoveRequest,
 	BatchMoveResponse,
@@ -80,6 +80,13 @@ export const inventoryApi = {
 	 * Get a single inventory item by ID
 	 */
 	get: (id: number) => apiClient.get<Inventory>(`/inventory/${id}`),
+
+	/**
+	 * Owned, decked and free copies of a card across all its printings, as seen by
+	 * the deck allocation service.
+	 */
+	availability: (oracleId: string) =>
+		apiClient.get<DeckAvailability>(`/inventory/availability/${encodeURIComponent(oracleId)}`),
 
 	/**
 	 * Create a new inventory item

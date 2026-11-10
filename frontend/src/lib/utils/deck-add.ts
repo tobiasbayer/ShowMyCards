@@ -1,4 +1,4 @@
-import type { CreateDeckItemRequest, DeckZone } from '$lib';
+import type { CreateDeckItemRequest, DeckAvailability, DeckCardUsage, DeckZone } from '$lib';
 
 /** A card offered to the "Add to deck" dialog. */
 export interface AddToDeckCard {
@@ -58,4 +58,73 @@ export function buildDeckItems(
 	}
 
 	return [...groups.values()].filter((item) => item.desired_quantity >= 1);
+}
+
+/** Adding a card would share copies that other decks already want. */
+export interface SharedCopyNotice {
+	owned: number;
+	/** Copies the other decks want, summed over their demand zones. */
+	wantedElsewhere: number;
+	/** Distinct names of the other decks that want the card. */
+	deckNames: string[];
+}
+
+export interface SharedCopyTarget {
+	deckId: number;
+	zone: DeckZone;
+	quantity: number;
+}
+
+/**
+ * Decide whether adding `quantity` copies of a card to a deck would take copies
+ * that other decks already want, so the owned copies could not build them all.
+ *
+ * Returns null, meaning nothing to warn about, when
+ * - the card goes to the maybe board (not committed demand);
+ * - none are owned (plain shortfall, which the deck's own summary reports);
+ * - enough copies are still free for the new quantity; or
+ * - no other deck wants the card (the committed copies are this deck's own).
+ *
+ * `usage` is the card's deck items from `/decks/for-card`: any-printing items
+ * plus items pinned to this printing. A deck that pinned a different printing of
+ * the same card is not listed there, so that conflict is not flagged here; the
+ * deck page still shows it.
+ */
+export function sharedCopyNotice(
+	availability: DeckAvailability,
+	usage: DeckCardUsage[],
+	{ deckId, zone, quantity }: SharedCopyTarget
+): SharedCopyNotice | null {
+	if (zone === 'maybe') return null;
+	if (availability.owned <= 0 || quantity <= availability.free) return null;
+
+	const elsewhere = usage.filter((u) => u.deck_id !== deckId && u.zone !== 'maybe');
+	if (elsewhere.length === 0) return null;
+
+	return {
+		owned: availability.owned,
+		wantedElsewhere: elsewhere.reduce((sum, u) => sum + u.desired_quantity, 0),
+		deckNames: [...new Set(elsewhere.map((u) => u.deck_name))]
+	};
+}
+
+function listNames(names: string[]): string {
+	return new Intl.ListFormat('en', { style: 'long', type: 'conjunction' }).format(names);
+}
+
+/** The sentence shown in the Add-to-deck dialog for a shared-copy notice. */
+export function sharedCopyMessage({ owned, wantedElsewhere, deckNames }: SharedCopyNotice): string {
+	return (
+		`You own ${owned} ${owned === 1 ? 'copy' : 'copies'} and ` +
+		`${wantedElsewhere} ${wantedElsewhere === 1 ? 'is' : 'are'} already in ${listNames(deckNames)}. ` +
+		`Adding it here means they can't all be built at once.`
+	);
+}
+
+/** The toast shown after adding a card that shares copies with other decks. */
+export function sharedCopyAddedMessage(
+	added: string,
+	{ deckNames }: Pick<SharedCopyNotice, 'deckNames'>
+): string {
+	return `${added}. It's also wanted by ${listNames(deckNames)}; you don't own enough copies for all of them.`;
 }
