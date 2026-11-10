@@ -1,16 +1,15 @@
 <!--
-	PROTOTYPE, throwaway. Floating bottom bar that cycles UI prototype variants via
-	the `?variant=` search param. Rendered only in dev builds.
+	PROTOTYPE. Floating bottom bar that cycles UI prototype variants via the
+	`?variant=` search param. On the prototype branch it ships in production builds too.
 -->
 <script lang="ts">
-	import { dev } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { ChevronLeft, ChevronRight } from '@lucide/svelte';
 
 	interface Variant {
-		/** `null` means "no variant param", i.e. the page as it ships today. */
+		/** `null` means "no variant param", i.e. the route's default page. */
 		key: string | null;
 		label: string;
 	}
@@ -55,30 +54,28 @@
 	}
 </script>
 
-<svelte:window onkeydown={dev ? onKeydown : undefined} />
+<svelte:window onkeydown={onKeydown} />
 
-{#if dev}
-	<div
-		class="fixed bottom-4 left-1/2 z-[60] -translate-x-1/2 flex items-center gap-1 rounded-full bg-neutral py-1 pl-1 pr-3 text-sm text-neutral-content shadow-xl ring-1 ring-black/10">
-		<button
-			type="button"
-			class="btn btn-circle btn-ghost btn-xs text-neutral-content"
-			aria-label="Previous variant"
-			onclick={() => cycle(-1)}>
-			<ChevronLeft class="size-4" />
-		</button>
-		<span class="min-w-36 text-center font-medium tabular-nums">
-			{index + 1}/{variants.length} · {current.label}
-		</span>
-		<button
-			type="button"
-			class="btn btn-circle btn-ghost btn-xs text-neutral-content"
-			aria-label="Next variant"
-			onclick={() => cycle(1)}>
-			<ChevronRight class="size-4" />
-		</button>
-		{#if note && current.key !== null}
-			<span class="ml-1 border-l border-neutral-content/20 pl-3 text-xs opacity-60">{note}</span>
-		{/if}
-	</div>
-{/if}
+<div
+	class="fixed bottom-4 left-1/2 z-[60] -translate-x-1/2 flex items-center gap-1 rounded-full bg-neutral py-1 pl-1 pr-3 text-sm text-neutral-content shadow-xl ring-1 ring-black/10">
+	<button
+		type="button"
+		class="btn btn-circle btn-ghost btn-xs text-neutral-content"
+		aria-label="Previous variant"
+		onclick={() => cycle(-1)}>
+		<ChevronLeft class="size-4" />
+	</button>
+	<span class="min-w-36 text-center font-medium tabular-nums">
+		{index + 1}/{variants.length} · {current.label}
+	</span>
+	<button
+		type="button"
+		class="btn btn-circle btn-ghost btn-xs text-neutral-content"
+		aria-label="Next variant"
+		onclick={() => cycle(1)}>
+		<ChevronRight class="size-4" />
+	</button>
+	{#if note && current.key !== null}
+		<span class="ml-1 border-l border-neutral-content/20 pl-3 text-xs opacity-60">{note}</span>
+	{/if}
+</div>

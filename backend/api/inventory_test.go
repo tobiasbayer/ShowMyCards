@@ -35,6 +35,8 @@ func setupInventoryTestApp(t *testing.T) (*fiber.App, *gorm.DB) {
 	handler := NewInventoryHandler(db, services.NewAutoSortService(db))
 
 	app.Get("/api/inventory", handler.List)
+	app.Get("/api/inventory/auto-location", handler.AutoLocation)
+	app.Get("/api/inventory/availability/:oracle_id", handler.Availability)
 	app.Get("/api/inventory/:id", handler.Get)
 	app.Post("/api/inventory", handler.Create)
 	app.Put("/api/inventory/:id", handler.Update)
@@ -772,6 +774,8 @@ func setupInventoryTestAppWithRules(t *testing.T) (*fiber.App, *gorm.DB) {
 	handler := NewInventoryHandler(db, services.NewAutoSortService(db))
 
 	app.Get("/api/inventory", handler.List)
+	app.Get("/api/inventory/auto-location", handler.AutoLocation)
+	app.Get("/api/inventory/availability/:oracle_id", handler.Availability)
 	app.Get("/api/inventory/:id", handler.Get)
 	app.Post("/api/inventory", handler.Create)
 	app.Put("/api/inventory/:id", handler.Update)

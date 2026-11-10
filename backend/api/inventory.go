@@ -94,13 +94,21 @@ func (h *InventoryHandler) Get(c fiber.Ctx) error {
 	return c.JSON(item)
 }
 
-// CreateInventoryRequest represents the request body for creating an inventory item
+// CreateInventoryRequest represents the request body for creating an inventory item.
+// Without a storage location the sorting rules pick one, unless Unassigned is set.
 type CreateInventoryRequest struct {
 	ScryfallID        string `json:"scryfall_id"`
 	OracleID          string `json:"oracle_id"`
 	Treatment         string `json:"treatment,omitempty"`
 	Quantity          int    `json:"quantity"`
 	StorageLocationID *uint  `json:"storage_location_id,omitempty"`
+	// Unassigned creates the item without a storage location and skips the
+	// sorting rules. It cannot be combined with StorageLocationID.
+	Unassigned bool `json:"unassigned,omitempty"`
+	// Merge adds the quantity to the oldest existing item with the same printing,
+	// treatment and (resolved) location instead of inserting a new row, so a stack
+	// stays one row. The response is then 200 with that item instead of 201.
+	Merge bool `json:"merge,omitempty"`
 }
 
 // Create creates a new inventory item
@@ -119,6 +127,9 @@ func (h *InventoryHandler) Create(c fiber.Ctx) error {
 	if err := utils.CombineErrors(validationErrors); err != nil {
 		return utils.ReturnError(c, fiber.StatusBadRequest, err.Error())
 	}
+	if req.Unassigned && req.StorageLocationID != nil {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "unassigned cannot be combined with storage_location_id")
+	}
 
 	// Set default quantity if not provided
 	if req.Quantity == 0 {
@@ -135,7 +146,7 @@ func (h *InventoryHandler) Create(c fiber.Ctx) error {
 			return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 				"Failed to validate storage location", "storage location lookup failed", err)
 		}
-	} else {
+	} else if !req.Unassigned {
 		// If no storage location provided, automatically evaluate sorting rules
 		slog.Info("evaluating sorting rules", "component", "inventory", "scryfall_id", req.ScryfallID)
 
@@ -155,9 +166,28 @@ func (h *InventoryHandler) Create(c fiber.Ctx) error {
 		StorageLocationID: req.StorageLocationID,
 	}
 
-	if err := h.db.WithContext(c.RequestCtx()).Create(&item).Error; err != nil {
+	status := fiber.StatusCreated
+	err := h.db.WithContext(c.RequestCtx()).Transaction(func(tx *gorm.DB) error {
+		if req.Merge {
+			existing, err := findStackRow(tx, req.ScryfallID, req.Treatment, req.StorageLocationID)
+			if err != nil {
+				return err
+			}
+			if existing != nil {
+				if err := tx.Model(existing).
+					Update("quantity", gorm.Expr("quantity + ?", req.Quantity)).Error; err != nil {
+					return fmt.Errorf("increment existing item: %w", err)
+				}
+				item = *existing
+				status = fiber.StatusOK
+				return nil
+			}
+		}
+		return tx.Create(&item).Error
+	})
+	if err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
-			"Failed to create inventory item", "database insert failed", err)
+			"Failed to create inventory item", "database write failed", err)
 	}
 
 	// Reload with storage location
@@ -166,7 +196,72 @@ func (h *InventoryHandler) Create(c fiber.Ctx) error {
 			"Failed to reload inventory item", "database query failed", err)
 	}
 
-	return c.Status(fiber.StatusCreated).JSON(item)
+	return c.Status(status).JSON(item)
+}
+
+// findStackRow returns the oldest item of a stack (same printing, treatment and
+// location; a nil location means unassigned), or nil when the stack is empty.
+func findStackRow(tx *gorm.DB, scryfallID, treatment string, locationID *uint) (*models.Inventory, error) {
+	query := tx.Where("scryfall_id = ? AND treatment = ?", scryfallID, treatment)
+	if locationID == nil {
+		query = query.Where("storage_location_id IS NULL")
+	} else {
+		query = query.Where("storage_location_id = ?", *locationID)
+	}
+	var row models.Inventory
+	if err := query.Order("id").First(&row).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("find stack row: %w", err)
+	}
+	return &row, nil
+}
+
+// AutoLocationResponse is the storage location the sorting rules would assign
+// to a new item, or null when no rule matches.
+// tygo:export
+type AutoLocationResponse struct {
+	StorageLocation *models.StorageLocation `json:"storage_location"`
+}
+
+// AutoLocation previews where Create would auto-sort a card (same code path),
+// without writing anything. Query params: scryfall_id (required), treatment.
+func (h *InventoryHandler) AutoLocation(c fiber.Ctx) error {
+	scryfallID := c.Query("scryfall_id")
+	if scryfallID == "" {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "scryfall_id is required")
+	}
+
+	locationID, err := h.autoSortSvc.DetermineStorageLocation(c.RequestCtx(), scryfallID, c.Query("treatment"))
+	if err != nil || locationID == nil {
+		// Same as Create: an unknown card or no matching rule means "no location".
+		slog.Debug("auto-sort preview found no location", "component", "inventory", "scryfall_id", scryfallID, "error", err)
+		return c.JSON(AutoLocationResponse{})
+	}
+
+	var location models.StorageLocation
+	if err := h.db.WithContext(c.RequestCtx()).First(&location, *locationID).Error; err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to load storage location", "storage location lookup failed", err)
+	}
+	return c.JSON(AutoLocationResponse{StorageLocation: &location})
+}
+
+// Availability returns how many copies of a card (all printings) are owned,
+// committed to decks, and free for deck building.
+func (h *InventoryHandler) Availability(c fiber.Ctx) error {
+	availability, err := h.allocation.ComputeAvailability(c.RequestCtx())
+	if err != nil {
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to compute deck availability", "allocation service failed", err)
+	}
+	return c.JSON(deckAvailability(availability.OracleAvailabilityFor(c.Params("oracle_id"))))
+}
+
+// deckAvailability maps the allocation service's per-Oracle result to the API shape.
+func deckAvailability(oa services.OracleAvailability) DeckAvailability {
+	return DeckAvailability{Owned: oa.Owned, Decked: oa.Owned - oa.Free, Free: oa.Free}
 }
 
 // UpdateInventoryRequest represents the request body for updating an inventory item
@@ -418,14 +513,9 @@ func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
 	// Attach per-Oracle deck availability (owned / decked / free) to every card.
 	cards := make([]InventoryCard, len(enhancedResults))
 	for i := range enhancedResults {
-		oa := availability.OracleAvailabilityFor(enhancedResults[i].OracleID)
 		cards[i] = InventoryCard{
 			EnhancedCardResult: enhancedResults[i],
-			Deck: DeckAvailability{
-				Owned:  oa.Owned,
-				Decked: oa.Owned - oa.Free,
-				Free:   oa.Free,
-			},
+			Deck:               deckAvailability(availability.OracleAvailabilityFor(enhancedResults[i].OracleID)),
 		}
 	}
 

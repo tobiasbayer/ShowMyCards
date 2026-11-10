@@ -1,22 +1,21 @@
 <script lang="ts">
 	import { SearchIcon } from '@lucide/svelte';
-	import { dev } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 
-	// PROTOTYPE: inside the `?variant=` Cards prototype, navbar search lands in its
-	// Catalog source instead of posting to today's search action.
-	const protoVariant = $derived(
-		dev && page.url.pathname === '/search' ? page.url.searchParams.get('variant') : null
+	// PROTOTYPE branch: navbar search lands in the Cards page's "All cards" scope.
+	// Only today's search page (`/search?variant=current`) keeps its POST action.
+	const onCurrentSearch = $derived(
+		page.url.pathname === '/search' && page.url.searchParams.get('variant') === 'current'
 	);
 
 	function onsubmit(event: SubmitEvent) {
-		if (!protoVariant) return;
+		if (onCurrentSearch) return;
 		event.preventDefault();
 		const form = event.currentTarget as HTMLFormElement;
 		const q = new FormData(form).get('q')?.toString().trim() ?? '';
-		const params = new URLSearchParams({ variant: protoVariant, source: 'catalog', q });
+		const params = new URLSearchParams({ source: 'catalog', q });
 		goto(resolve(`/search?${params}` as '/search'));
 	}
 </script>

@@ -1,17 +1,23 @@
-// PROTOTYPE, throwaway. Answers: "what should a unified, uncluttered Cards page
-// (Collection + Catalog, detail panel, Add popover) look like?"
-// State lives in memory only; nothing here writes to the backend.
+// PROTOTYPE. Answers: "what should a unified, uncluttered Cards page
+// (all cards + the collection, detail panel, Add popover) look like?"
+// Writes go to the real backend through the /api proxy; what they return
+// overrides the page's loaded data until the next server load.
 
 import { goto, replaceState } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
-import type {
-	DeckAvailability,
-	EnhancedCardResult,
-	EvaluateResponse,
-	SearchResponse,
-	StorageLocation
+import {
+	apiClient,
+	notifications,
+	type DeckAvailability,
+	type EnhancedCardResult,
+	type Inventory,
+	type SearchResponse,
+	type StorageLocation
 } from '$lib';
+import { aggregateStacks, pickRowToDecrement, rowsOfStack, type Stack } from './stacks';
+
+export type { Stack } from './stacks';
 
 export type Source = 'collection' | 'catalog';
 export type LocationFilter = 'all' | 'unassigned' | number;
@@ -20,6 +26,8 @@ export type LocationFilter = 'all' | 'unassigned' | number;
  * the collection (`all` = every location, `unassigned`, or one location id).
  */
 export type Scope = 'catalog' | LocationFilter;
+/** Where an added copy goes: a location id, unassigned, or wherever the sorting rules say. */
+export type Destination = number | 'unassigned' | 'auto';
 
 /** Data the server load hands to the prototype (see ../+page.server.ts). */
 export interface ProtoData {
@@ -33,70 +41,145 @@ export interface ProtoData {
 	error: string | null;
 }
 
-/** Copies of one printing, in one finish, at one location. */
-export interface Stack {
-	finish: string;
-	locationId: number | null;
-	quantity: number;
-}
-
-const stackKey = (finish: string, locationId: number | null) => `${finish}|${locationId ?? 'none'}`;
-
-function parseStackKey(key: string): { finish: string; locationId: number | null } {
-	const [finish, loc] = key.split('|');
-	return { finish, locationId: loc === 'none' ? null : Number(loc) };
-}
-
 /**
- * In-memory changes layered over server data. Module-level so it survives
- * source and variant switches; a full page reload resets it.
+ * Server data re-read after this session's writes. It overrides the page's
+ * loaded data; a new server load brings fresh data, so CardsView resets it.
  */
-class Changes {
-	/** cardId -> stackKey -> quantity delta */
-	byCard = $state<Record<string, Record<string, number>>>({});
-	/** Cards added in this session that the server collection doesn't know yet. */
-	added = $state<Record<string, EnhancedCardResult>>({});
-	/** oracleId -> net copies added across all printings (deck availability is per card, not printing). */
-	byOracle = $state<Record<string, number>>({});
+class Live {
+	/** cardId -> the printing's inventory rows. */
+	rows = $state<Record<string, Inventory[]>>({});
+	/** oracleId -> copies owned / decked / free. */
+	availability = $state<Record<string, DeckAvailability>>({});
+	/** Cards that gained copies here, so My collection lists them before a reload. */
+	owned = $state<Record<string, EnhancedCardResult>>({});
+	/** cardIds with a write in flight. */
+	busy = $state<Record<string, boolean>>({});
 
-	adjust(card: EnhancedCardResult, finish: string, locationId: number | null, n: number) {
-		const forCard = (this.byCard[card.id] ??= {});
-		const key = stackKey(finish, locationId);
-		forCard[key] = (forCard[key] ?? 0) + n;
-		this.byOracle[card.oracle_id] = (this.byOracle[card.oracle_id] ?? 0) + n;
-		if (n > 0 && !this.added[card.id]) this.added[card.id] = card;
-	}
-
-	move(
-		card: EnhancedCardResult,
-		finish: string,
-		from: number | null,
-		to: number | null,
-		n: number
-	) {
-		this.adjust(card, finish, from, -n);
-		this.adjust(card, finish, to, n);
+	reset() {
+		this.rows = {};
+		this.availability = {};
+		this.owned = {};
+		this.busy = {};
 	}
 }
 
-export const changes = new Changes();
+export const live = new Live();
 
 /** Open Add popovers; Esc closes a popover before it closes the detail panel. */
 export const ui = $state({ openPopovers: 0 });
 
-/** Server stacks for this printing merged with in-memory changes. */
+/** The printing's rows: re-read after a write, else as loaded. */
+function currentRows(card: EnhancedCardResult): Inventory[] {
+	return live.rows[card.id] ?? card.inventory.this_printing;
+}
+
 export function effectiveStacks(card: EnhancedCardResult): Stack[] {
-	const totals: Record<string, number> = {};
-	for (const row of card.inventory.this_printing) {
-		const key = stackKey(row.treatment || 'nonfoil', row.storage_location_id ?? null);
-		totals[key] = (totals[key] ?? 0) + row.quantity;
-	}
-	for (const [key, n] of Object.entries(changes.byCard[card.id] ?? {})) {
-		totals[key] = (totals[key] ?? 0) + n;
-	}
-	return Object.entries(totals)
-		.filter(([, quantity]) => quantity > 0)
-		.map(([key, quantity]) => ({ ...parseStackKey(key), quantity }));
+	return aggregateStacks(currentRows(card));
+}
+
+interface Page<T> {
+	data: T[] | null;
+}
+
+/** Re-reads one card's rows and its deck availability after a write. */
+async function refresh(card: EnhancedCardResult) {
+	const [rows, availability] = await Promise.all([
+		apiClient.get<Page<Inventory>>(
+			`/inventory?scryfall_id=${encodeURIComponent(card.id)}&page_size=100`
+		),
+		apiClient.get<DeckAvailability>(`/inventory/availability/${encodeURIComponent(card.oracle_id)}`)
+	]);
+	live.rows[card.id] = rows.data ?? [];
+	live.availability[card.oracle_id] = availability;
+	if (live.rows[card.id].some((r) => r.quantity > 0)) live.owned[card.id] = card;
+}
+
+// eslint-disable-next-line svelte/prefer-svelte-reactivity -- write queue, not reactive state
+const queues = new Map<string, Promise<unknown>>();
+
+/**
+ * Runs one write for a card after the previous one finished, so quick repeated
+ * clicks can't race, then re-reads the card. Errors become a toast.
+ */
+function enqueue<T>(card: EnhancedCardResult, write: () => Promise<T>): Promise<T | undefined> {
+	const run = (queues.get(card.id) ?? Promise.resolve()).then(async () => {
+		live.busy[card.id] = true;
+		try {
+			const result = await write();
+			await refresh(card);
+			return result;
+		} catch (e) {
+			notifications.error(`Couldn't save: ${e instanceof Error ? e.message : 'unknown error'}`);
+			await refresh(card).catch(() => {});
+			return undefined;
+		} finally {
+			live.busy[card.id] = false;
+		}
+	});
+	queues.set(card.id, run);
+	return run;
+}
+
+function decrementRow(row: Inventory) {
+	return row.quantity > 1
+		? apiClient.put<Inventory>(`/inventory/${row.id}`, { quantity: row.quantity - 1 })
+		: apiClient.delete(`/inventory/${row.id}`);
+}
+
+/** Adds one copy; it joins an existing stack at the destination. Resolves to the saved row. */
+export function addCopy(
+	card: EnhancedCardResult,
+	finish: string,
+	destination: Destination
+): Promise<Inventory | undefined> {
+	return enqueue(card, () =>
+		apiClient.post<Inventory>('/inventory', {
+			scryfall_id: card.id,
+			oracle_id: card.oracle_id,
+			treatment: finish,
+			quantity: 1,
+			merge: true,
+			...(destination === 'unassigned'
+				? { unassigned: true }
+				: destination === 'auto'
+					? {}
+					: { storage_location_id: destination })
+		})
+	);
+}
+
+/** Removes one copy from a stack. */
+export function removeCopy(card: EnhancedCardResult, stack: Stack) {
+	return enqueue(card, async () => {
+		const row = pickRowToDecrement(currentRows(card), stack);
+		if (row) await decrementRow(row);
+	});
+}
+
+/** Takes back one copy from the row an add returned. */
+export function undoAdd(card: EnhancedCardResult, added: Inventory) {
+	return enqueue(card, async () => {
+		const row = currentRows(card).find((r) => r.id === added.id);
+		if (row && row.quantity > 0) await decrementRow(row);
+	});
+}
+
+/** Moves every copy of a stack; the backend joins it with a stack already at the destination. */
+export function moveStack(card: EnhancedCardResult, stack: Stack, to: number | null) {
+	return enqueue(card, async () => {
+		const rows = rowsOfStack(currentRows(card), stack);
+		if (rows.length === 0 || to === stack.locationId) return;
+		const quantity = rows.reduce((sum, r) => sum + r.quantity, 0);
+		await apiClient.post(`/inventory/${rows[0].id}/split-move`, {
+			quantity,
+			...(to === null ? {} : { storage_location_id: to })
+		});
+	});
+}
+
+/** After adding a card to a deck, re-read its availability (the deck badge). */
+export function refreshCard(card: EnhancedCardResult) {
+	return enqueue(card, async () => {});
 }
 
 export function matchesLocation(stack: Stack, filter: LocationFilter): boolean {
@@ -145,22 +228,23 @@ export function existingLocation(card: EnhancedCardResult): number | null | unde
 // eslint-disable-next-line svelte/prefer-svelte-reactivity -- module-level cache, not reactive state
 const autoCache = new Map<string, Promise<number | null>>();
 
+/** Mirrors the backend's AutoLocationResponse (its generated type leaves the location untyped). */
+interface AutoLocation {
+	storage_location: StorageLocation | null;
+}
+
 /**
- * Where the sorting rules would put this card. Uses the same evaluate call as
- * RuleTester, so rules on fields CardResult lacks may resolve differently from
- * the real auto-sort (which reads the full local card JSON).
+ * Where the sorting rules would put this card, from the same code the backend
+ * runs when it auto-sorts a new copy, so the preview matches the real outcome.
  */
 export function resolveAuto(card: EnhancedCardResult, finish: string): Promise<number | null> {
 	const key = `${card.id}|${finish}`;
 	let pending = autoCache.get(key);
 	if (!pending) {
-		pending = fetch('/api/sorting-rules/evaluate', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ card_data: card, treatment: finish })
-		})
-			.then((r) => (r.ok ? (r.json() as Promise<EvaluateResponse>) : null))
-			.then((res) => (res?.matched ? (res.storage_location?.id ?? null) : null))
+		const query = `scryfall_id=${encodeURIComponent(card.id)}&treatment=${encodeURIComponent(finish)}`;
+		pending = apiClient
+			.get<AutoLocation>(`/inventory/auto-location?${query}`)
+			.then((res) => res.storage_location?.id ?? null)
 			.catch(() => null);
 		autoCache.set(key, pending);
 	}
@@ -212,29 +296,26 @@ export class CardsView {
 		this.error = proto.error;
 		this.locations = locations;
 		this.availability = proto.availability;
+		// Fresh server data supersedes what earlier writes re-read.
+		live.reset();
 		const loc = page.url.searchParams.get('location');
 		if (loc === 'unassigned') this.location = 'unassigned';
 		else if (loc && /^\d+$/.test(loc)) this.location = Number(loc);
 	}
 
-	/**
-	 * Copies of this card free for deck building, across all printings, like the
-	 * backend's allocation. In-session adds and removals shift `free` one for one;
-	 * this overstates it only when the card is already over-committed to decks.
-	 */
+	/** Copies of this card (all printings) owned, committed to decks, and free for deck building. */
 	forDecks(card: EnhancedCardResult): DeckAvailability {
-		const base = this.availability[card.oracle_id];
-		const delta = changes.byOracle[card.oracle_id] ?? 0;
-		const owned = Math.max(0, (base?.owned ?? 0) + delta);
-		const free = Math.min(owned, Math.max(0, (base?.free ?? 0) + delta));
-		return { owned, decked: owned - free, free };
+		return (
+			live.availability[card.oracle_id] ??
+			this.availability[card.oracle_id] ?? { owned: 0, decked: 0, free: 0 }
+		);
 	}
 
-	/** Collection printings matching name + location, newest first; in-session adds on top. */
+	/** Collection printings matching name + location, newest first; cards owned since load on top. */
 	filteredCollection = $derived.by(() => {
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local lookup in derived computation
 		const known = new Set(this.collection.map((c) => c.id));
-		const fresh = Object.values(changes.added).filter((c) => !known.has(c.id));
+		const fresh = Object.values(live.owned).filter((c) => !known.has(c.id));
 		const needle = this.query.trim().toLowerCase();
 		return [...fresh.reverse(), ...this.collection].filter(
 			(card) =>

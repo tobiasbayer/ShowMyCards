@@ -3,8 +3,8 @@
 	import { untrack } from 'svelte';
 	import { enhance, deserialize } from '$app/forms';
 	import { resolve } from '$app/paths';
-	// PROTOTYPE: `?variant=` Cards page prototype (dev only), see ./prototype/
-	import { dev } from '$app/environment';
+	// PROTOTYPE branch: /search renders the Cards page (./prototype/);
+	// `?variant=current` renders today's search page below.
 	import PrototypeSwitcher from '$lib/components/PrototypeSwitcher.svelte';
 	import VariantPush from './prototype/VariantPush.svelte';
 	import type { ActionData, PageData } from './$types';
@@ -32,11 +32,10 @@
 
 	let { form, data }: { form: ActionData; data: PageData } = $props();
 
-	// PROTOTYPE: the switcher toggles between today's page (`null`) and the winning
-	// push-aside variant. Overlay and bottom-sheet were dropped.
+	// PROTOTYPE: the switcher toggles between the Cards page (no param) and today's page.
 	const protoVariants = [
-		{ key: null, label: 'Current' },
-		{ key: 'push', label: 'Push-aside' }
+		{ key: null, label: 'Cards' },
+		{ key: 'current', label: 'Current search' }
 	];
 
 	let searching = $state(false);
@@ -187,7 +186,7 @@
 	<title>Search Cards - ShowMyCards</title>
 </svelte:head>
 
-{#if dev && data.proto}
+{#if data.proto}
 	{#key data.proto}
 		<VariantPush proto={data.proto} locations={data.storageLocations} />
 	{/key}
@@ -467,6 +466,4 @@
 		}} />
 {/if}
 
-{#if dev}
-	<PrototypeSwitcher variants={protoVariants} note="Prototype · changes aren't saved" />
-{/if}
+<PrototypeSwitcher variants={protoVariants} />

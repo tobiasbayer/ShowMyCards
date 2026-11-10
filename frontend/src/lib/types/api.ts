@@ -337,7 +337,8 @@ export interface HealthHandler {}
  */
 export interface InventoryHandler {}
 /**
- * CreateInventoryRequest represents the request body for creating an inventory item
+ * CreateInventoryRequest represents the request body for creating an inventory item.
+ * Without a storage location the sorting rules pick one, unless Unassigned is set.
  */
 export interface CreateInventoryRequest {
 	scryfall_id: string;
@@ -345,6 +346,25 @@ export interface CreateInventoryRequest {
 	treatment?: string;
 	quantity: number /* int */;
 	storage_location_id?: number /* uint */;
+	/**
+	 * Unassigned creates the item without a storage location and skips the
+	 * sorting rules. It cannot be combined with StorageLocationID.
+	 */
+	unassigned?: boolean;
+	/**
+	 * Merge adds the quantity to the oldest existing item with the same printing,
+	 * treatment and (resolved) location instead of inserting a new row, so a stack
+	 * stays one row. The response is then 200 with that item instead of 201.
+	 */
+	merge?: boolean;
+}
+/**
+ * AutoLocationResponse is the storage location the sorting rules would assign
+ * to a new item, or null when no rule matches.
+ * tygo:export
+ */
+export interface AutoLocationResponse {
+	storage_location?: any /* models.StorageLocation */;
 }
 /**
  * UpdateInventoryRequest represents the request body for updating an inventory item

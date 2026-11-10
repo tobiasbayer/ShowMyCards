@@ -1,21 +1,24 @@
 <!--
-	PROTOTYPE, throwaway. Compact Add popover: one button per finish (each click
-	adds one copy), one destination line showing the resolved location, and a
-	running tally with undo. Writes go to in-memory state only.
+	PROTOTYPE. Compact Add popover: one button per finish (each click saves one
+	copy), one destination line showing the resolved location, and a running
+	tally with undo.
 -->
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import type { EnhancedCardResult } from '$lib';
+	import type { EnhancedCardResult, Inventory } from '$lib';
 	import { getAvailableTreatments } from '$lib';
 	import { Check, ChevronDown, MapPin, Plus } from '@lucide/svelte';
 	import {
-		changes,
+		addCopy,
 		existingLocation,
 		finishLabel,
+		live,
 		locationName,
 		resolveAuto,
 		ui,
-		type CardsView
+		undoAdd,
+		type CardsView,
+		type Destination
 	} from './state.svelte';
 
 	let {
@@ -30,7 +33,7 @@
 		inline?: boolean;
 	} = $props();
 
-	type Destination = 'existing' | 'auto' | 'unassigned' | number;
+	type Choice = 'existing' | 'auto' | 'unassigned' | number;
 
 	const finishes = $derived(
 		getAvailableTreatments(card.finishes, card.frame_effects ?? [], card.promo_types ?? [])
@@ -39,10 +42,12 @@
 	const existing = untrack(() => existingLocation(card));
 
 	let activeFinish = $state(untrack(() => card.finishes[0] ?? 'nonfoil'));
-	let destination = $state<Destination>(existing !== undefined ? 'existing' : 'auto');
+	let destination = $state<Choice>(existing !== undefined ? 'existing' : 'auto');
 	let auto = $state<Record<string, number | null | undefined>>({});
 	let picking = $state(false);
-	let added = $state<{ finish: string; locationId: number | null }[]>([]);
+	/** Rows the adds saved to, newest last; Undo takes a copy back from the last. */
+	let added = $state<Inventory[]>([]);
+	const busy = $derived(live.busy[card.id] ?? false);
 	let root = $state<HTMLElement>();
 
 	onMount(() => {
@@ -68,33 +73,42 @@
 		destination === 'existing' ? 'next to your copies' : destination === 'auto' ? 'by rules' : ''
 	);
 
-	function add(finish: string) {
+	async function add(finish: string) {
 		activeFinish = finish;
-		const locationId = target(finish);
-		if (locationId === undefined) return;
-		changes.adjust(card, finish, locationId, 1);
-		added = [...added, { finish, locationId }];
+		// Auto lets the backend run the sorting rules itself; the line shows its preview.
+		const to: Destination =
+			destination === 'existing'
+				? (existing ?? 'unassigned') // "next to your copies" may be the unassigned stack
+				: destination;
+		const row = await addCopy(card, finish, to);
+		if (row) added = [...added, row];
 	}
 
 	function undo() {
 		const last = added.at(-1);
 		if (!last) return;
-		changes.adjust(card, last.finish, last.locationId, -1);
 		added = added.slice(0, -1);
+		undoAdd(card, last);
 	}
 
-	function choose(d: Destination) {
+	function choose(d: Choice) {
 		destination = d;
 		picking = false;
 	}
 
 	const tally = $derived.by(() => {
 		if (added.length === 0) return '';
-		const kinds = new Set(added.map((a) => a.finish));
+		const kinds = new Set(added.map((a) => a.treatment));
 		const last = added.at(-1)!;
 		const what =
-			kinds.size === 1 ? `${added.length}× ${finishLabel(last.finish)}` : `${added.length} copies`;
-		return `Added ${what}`;
+			kinds.size === 1
+				? `${added.length}× ${finishLabel(last.treatment)}`
+				: `${added.length} copies`;
+		// Name the saved location only when it isn't the one the line shows.
+		const savedTo = last.storage_location_id ?? null;
+		return savedTo === current
+			? `Added ${what}`
+			: `Added ${what} · ${locationName(view.locations, savedTo)}`;
 	});
 
 	function onKeydown(event: KeyboardEvent) {
@@ -162,6 +176,7 @@
 						? 'btn-primary'
 						: 'btn-soft'}"
 					title="Add one {f.name}"
+					disabled={busy}
 					onmouseenter={() => (activeFinish = f.key)}
 					onfocus={() => (activeFinish = f.key)}
 					onclick={() => add(f.key)}>
@@ -186,7 +201,11 @@
 		{#if tally}
 			<div class="mt-1 flex items-center gap-2 px-1.5 text-xs text-base-content/60">
 				<span class="truncate">{tally}</span>
-				<button type="button" class="link ml-auto shrink-0 link-hover" onclick={undo}>Undo</button>
+				<button
+					type="button"
+					class="link ml-auto shrink-0 link-hover"
+					disabled={busy}
+					onclick={undo}>Undo</button>
 			</div>
 		{/if}
 	{/if}

@@ -18,6 +18,8 @@ func InventoryRoutes(app *fiber.App, db *gorm.DB) {
 	inventory.Get("/cards", handler.ListAsCards)
 	inventory.Get("/unassigned/count", handler.GetUnassignedCount)
 	inventory.Get("/by-oracle/:oracle_id", handler.ByOracle)
+	inventory.Get("/auto-location", handler.AutoLocation)
+	inventory.Get("/availability/:oracle_id", handler.Availability)
 	inventory.Post("/batch/move", handler.BatchMove)
 	inventory.Delete("/batch", handler.BatchDelete)
 	inventory.Post("/resort", handler.Resort)

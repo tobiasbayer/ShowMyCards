@@ -14,7 +14,6 @@ import { loadStorageLocations } from '$lib/server/storage';
 import { fetchAllInventoryCards } from '$lib/server/inventory-cards';
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
-import { dev } from '$app/environment';
 import type { ProtoData } from './prototype/state.svelte';
 
 // Load storage locations for the dropdown and the saved default language
@@ -23,8 +22,9 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 		loadStorageLocations(fetch),
 		loadDefaultLanguage(fetch)
 	]);
-	// PROTOTYPE: data for the `?variant=` Cards page prototype (dev only).
-	const proto = dev && url.searchParams.get('variant') ? await loadPrototype(fetch, url) : null;
+	// PROTOTYPE branch: /search is the Cards page; `?variant=current` is today's search page.
+	const proto =
+		url.searchParams.get('variant') === 'current' ? null : await loadPrototype(fetch, url);
 	return { storageLocations, defaultLanguage, proto };
 };
 
@@ -65,7 +65,8 @@ async function loadPrototype(fetch: typeof globalThis.fetch, url: URL): Promise<
 		}
 		data.availability = availabilityByOracle(await collection);
 	} catch (e) {
-		data.error = e instanceof Error ? e.message : 'Failed to load cards';
+		const reason = e instanceof Error ? e.message : 'unknown error';
+		data.error = `Couldn't load cards (${reason}). Is the backend running?`;
 	}
 	return data;
 }

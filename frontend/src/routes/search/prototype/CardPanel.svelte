@@ -1,5 +1,5 @@
 <!--
-	PROTOTYPE, throwaway. Detail panel: everything the tile leaves out.
+	PROTOTYPE. Detail panel: everything the tile leaves out. Copy and deck changes are saved.
 	Sections: header (+prices), oracle text, your copies, in decks, other printings.
 	Empty sections are hidden.
 -->
@@ -49,22 +49,22 @@
 
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import {
-		currency,
-		getDisplayName,
-		notifications,
-		type DeckCardUsage,
-		type EnhancedCardResult
-	} from '$lib';
+	import { currency, getDisplayName, type DeckCardUsage, type EnhancedCardResult } from '$lib';
+	import AddToDeckModal from '$lib/components/AddToDeckModal.svelte';
 	import { getTreatmentPrice } from '$lib/utils/card-prices';
-	import { ArrowRightLeft, Minus, Plus, X } from '@lucide/svelte';
+	import { Minus, Plus, X } from '@lucide/svelte';
 	import AddPopover from './AddPopover.svelte';
+	import MoveMenu from './MoveMenu.svelte';
 	import {
-		changes,
+		addCopy,
 		effectiveStacks,
 		finishLabel,
+		live,
 		locationName,
+		moveStack,
 		ownedCount,
+		refreshCard,
+		removeCopy,
 		type CardsView,
 		type Stack
 	} from './state.svelte';
@@ -74,7 +74,14 @@
 	let decks = $state<DeckCardUsage[] | null>(null);
 	let printings = $state<EnhancedCardResult[] | null>(null);
 	let adding = $state(false);
-	let movingKey = $state<string | null>(null);
+	let deckModal = $state(false);
+	const busy = $derived(live.busy[card.id] ?? false);
+
+	function loadDecks(id: string): Promise<DeckCardUsage[]> {
+		return fetch(`/api/decks/for-card/${id}`)
+			.then((r) => (r.ok ? (r.json() as Promise<DeckCardUsage[]>) : []))
+			.catch(() => []);
+	}
 
 	function loadPrintings(oracleId: string): Promise<EnhancedCardResult[]> {
 		let pending = printingsCache.get(oracleId);
@@ -96,14 +103,11 @@
 		decks = null;
 		printings = null;
 		adding = false;
-		movingKey = null;
+		deckModal = false;
 
-		fetch(`/api/decks/for-card/${id}`)
-			.then((r) => (r.ok ? (r.json() as Promise<DeckCardUsage[]>) : []))
-			.catch(() => [])
-			.then((d) => {
-				if (!cancelled) decks = d;
-			});
+		loadDecks(id).then((d) => {
+			if (!cancelled) decks = d;
+		});
 
 		if (oracleId) {
 			loadPrintings(oracleId).then((all) => {
@@ -144,15 +148,16 @@
 
 	const key = (s: Stack) => `${s.finish}|${s.locationId}`;
 
-	function move(s: Stack, value: string) {
-		movingKey = null;
-		if (value === '') return;
-		const to = value === 'unassigned' ? null : Number(value);
-		if (to !== s.locationId) changes.move(card, s.finish, s.locationId, to, s.quantity);
+	function addToDeck() {
+		deckModal = true;
 	}
 
-	function addToDeck() {
-		notifications.info('Prototype: this would open “Add to deck”.');
+	/** A deck now wants this card: re-read its decks and the deck badge's counts. */
+	async function onDeckAdded() {
+		const id = card.id;
+		refreshCard(card);
+		const d = await loadDecks(id);
+		if (card.id === id) decks = d;
 	}
 </script>
 
@@ -222,51 +227,37 @@
 				{#each stacks as s (key(s))}
 					<li class="flex items-center gap-2 py-1.5 text-sm">
 						<span class="w-16 shrink-0">{finishLabel(s.finish)}</span>
-						{#if movingKey === key(s)}
-							<!-- svelte-ignore a11y_autofocus -->
-							<select
-								class="select select-xs min-w-0 flex-1"
-								aria-label="Move to"
-								autofocus
-								onchange={(e) => move(s, e.currentTarget.value)}
-								onblur={() => (movingKey = null)}>
-								<option value="">Move to…</option>
-								{#each view.locations as loc (loc.id)}
-									{#if loc.id !== s.locationId}<option value={String(loc.id)}>{loc.name}</option
-										>{/if}
-								{/each}
-								{#if s.locationId !== null}<option value="unassigned">Unassigned</option>{/if}
-							</select>
-						{:else}
-							<span class="min-w-0 flex-1 truncate text-base-content/60">
-								{locationName(view.locations, s.locationId)}
-							</span>
-							<div class="flex shrink-0 items-center">
-								<button
-									type="button"
-									class="btn btn-square btn-ghost btn-xs"
-									aria-label="Remove one"
-									onclick={() => changes.adjust(card, s.finish, s.locationId, -1)}>
-									<Minus class="size-3.5" />
-								</button>
-								<span class="w-6 text-center font-medium tabular-nums">{s.quantity}</span>
-								<button
-									type="button"
-									class="btn btn-square btn-ghost btn-xs"
-									aria-label="Add one"
-									onclick={() => changes.adjust(card, s.finish, s.locationId, 1)}>
-									<Plus class="size-3.5" />
-								</button>
-								<button
-									type="button"
-									class="btn btn-square btn-ghost btn-xs ml-1"
-									aria-label="Move"
-									title="Move"
-									onclick={() => (movingKey = key(s))}>
-									<ArrowRightLeft class="size-3.5" />
-								</button>
-							</div>
-						{/if}
+						<span class="min-w-0 flex-1 truncate text-base-content/60">
+							{locationName(view.locations, s.locationId)}
+						</span>
+						<div class="flex shrink-0 items-center">
+							<button
+								type="button"
+								class="btn btn-square btn-ghost btn-xs"
+								aria-label="Remove one"
+								disabled={busy}
+								onclick={() => removeCopy(card, s)}>
+								<Minus class="size-3.5" />
+							</button>
+							<span class="w-6 text-center font-medium tabular-nums">{s.quantity}</span>
+							<button
+								type="button"
+								class="btn btn-square btn-ghost btn-xs"
+								aria-label="Add one"
+								disabled={busy}
+								onclick={() => addCopy(card, s.finish, s.locationId ?? 'unassigned')}>
+								<Plus class="size-3.5" />
+							</button>
+							<MoveMenu
+								locations={view.locations}
+								current={s.locationId}
+								label="Move {finishLabel(s.finish)} copies from {locationName(
+									view.locations,
+									s.locationId
+								)}"
+								disabled={busy}
+								onMove={(to) => moveStack(card, s, to)} />
+						</div>
 					</li>
 				{/each}
 			</ul>
@@ -288,7 +279,10 @@
 					<li class="flex items-center gap-2 py-1.5 text-sm">
 						<a
 							href={resolve('/decks/[id]', { id: String(d.deck_id) })}
-							class="link-hover min-w-0 flex-1 truncate">{d.deck_name}</a>
+							class="link-hover min-w-0 flex-1 truncate"
+							>{d.deck_name}{#if d.zone !== 'main'}<span class="text-base-content/45">
+									· {d.zone}</span
+								>{/if}</a>
 						<span class="shrink-0 tabular-nums text-base-content/60">{d.desired_quantity}×</span>
 					</li>
 				{/each}
@@ -348,6 +342,23 @@
 		{@render otherPrintings()}
 	</div>
 </div>
+
+{#if deckModal}
+	<AddToDeckModal
+		open
+		cards={[
+			{
+				oracle_id: card.oracle_id,
+				scryfall_id: card.id,
+				name: getDisplayName(card),
+				set_name: card.set_name,
+				image_uri: card.image_uri,
+				copies: 1
+			}
+		]}
+		onClose={() => (deckModal = false)}
+		onAdded={onDeckAdded} />
+{/if}
 
 <style>
 	.section-title {
