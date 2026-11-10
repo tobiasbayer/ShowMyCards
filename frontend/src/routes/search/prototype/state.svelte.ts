@@ -3,7 +3,7 @@
 // Writes go to the real backend through the /api proxy; what they return
 // overrides the page's loaded data until the next server load.
 
-import { goto, replaceState } from '$app/navigation';
+import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
 import {
@@ -39,6 +39,13 @@ export interface ProtoData {
 	/** oracle_id -> copies owned / decked / free across all printings (from the backend). */
 	availability: Record<string, DeckAvailability>;
 	error: string | null;
+	/** A search the backend couldn't run; `code` picks the hint (see QueryErrorResponse). */
+	queryError: QueryError | null;
+}
+
+export interface QueryError {
+	message: string;
+	code: string;
 }
 
 /**
@@ -280,6 +287,7 @@ export class CardsView {
 	catalogTotal = $state(0);
 	loadingMore = $state(false);
 	error = $state<string | null>(null);
+	queryError = $state<QueryError | null>(null);
 	visibleCount = $state(STEP);
 
 	readonly collection: EnhancedCardResult[];
@@ -294,6 +302,7 @@ export class CardsView {
 		this.hasMore = proto.catalog.hasMore;
 		this.catalogTotal = proto.catalog.total;
 		this.error = proto.error;
+		this.queryError = proto.queryError;
 		this.locations = locations;
 		this.availability = proto.availability;
 		// Fresh server data supersedes what earlier writes re-read.
@@ -311,16 +320,17 @@ export class CardsView {
 		);
 	}
 
-	/** Collection printings matching name + location, newest first; cards owned since load on top. */
+	/**
+	 * Collection printings in the server's order (the backend already applied the
+	 * query and scope); cards owned since load on top. The location check keeps a
+	 * card that was just moved out of the shown location from lingering.
+	 */
 	filteredCollection = $derived.by(() => {
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local lookup in derived computation
 		const known = new Set(this.collection.map((c) => c.id));
 		const fresh = Object.values(live.owned).filter((c) => !known.has(c.id));
-		const needle = this.query.trim().toLowerCase();
-		return [...fresh.reverse(), ...this.collection].filter(
-			(card) =>
-				(!needle || `${card.name} ${card.printed_name ?? ''}`.toLowerCase().includes(needle)) &&
-				effectiveStacks(card).some((s) => matchesLocation(s, this.location))
+		return [...fresh.reverse(), ...this.collection].filter((card) =>
+			effectiveStacks(card).some((s) => matchesLocation(s, this.location))
 		);
 	});
 
@@ -386,38 +396,11 @@ export class CardsView {
 	/** Applies a scope from the dropdown and reruns `query` in it. */
 	setScope(scope: Scope, query: string) {
 		this.query = query;
-		if (scope === 'catalog') {
-			this.navigate('catalog', 'all');
-		} else if (this.source === 'catalog') {
-			// The collection is loaded by the server load, so leaving Scryfall navigates.
-			this.navigate('collection', scope);
-		} else {
-			this.setLocation(scope);
-			this.setQuery(query);
-		}
+		if (scope === 'catalog') this.navigate('catalog', 'all');
+		else this.navigate('collection', scope);
 	}
 
-	/** Collection filtering is client-side and only mirrors the URL (no reload). */
-	setQuery(q: string) {
-		this.query = q;
-		if (this.source !== 'collection') return;
-		this.visibleCount = STEP;
-		const params = this.#params();
-		if (q) params.set('q', q);
-		else params.delete('q');
-		replaceState(resolve(searchPath(params) as '/search'), page.state);
-	}
-
-	setLocation(filter: LocationFilter) {
-		this.location = filter;
-		this.visibleCount = STEP;
-		const params = this.#params();
-		if (filter === 'all') params.delete('location');
-		else params.set('location', String(filter));
-		replaceState(resolve(searchPath(params) as '/search'), page.state);
-	}
-
-	/** Source switches and catalog searches go through the server load. */
+	/** Every search and scope change goes through the server load. */
 	navigate(source: Source, location?: LocationFilter) {
 		const params = this.#params();
 		params.set('source', source);

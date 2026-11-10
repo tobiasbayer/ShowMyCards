@@ -8,6 +8,7 @@ require (
 	github.com/expr-lang/expr v1.17.8
 	github.com/gofiber/fiber/v3 v3.3.0
 	go.uber.org/ratelimit v0.3.1
+	golang.org/x/text v0.37.0
 	gorm.io/gorm v1.31.1
 )
 
@@ -23,7 +24,6 @@ require (
 	github.com/tinylib/msgp v1.6.4 // indirect
 	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
 )
 
 require (

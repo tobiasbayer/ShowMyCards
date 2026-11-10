@@ -27,6 +27,32 @@ export interface BannerHandler {}
 export interface BulkDataHandler {}
 
 //////////
+// source: collection_search.go
+
+/**
+ * CollectionSearchResponse lists every owned printing that matches a
+ * collection search, each once, with all of its inventory rows. There is no
+ * paging: a personal collection is small enough to return in one response.
+ * tygo:export
+ */
+export interface CollectionSearchResponse {
+	data: InventoryCard[];
+	total_cards: number /* int */;
+}
+/**
+ * QueryErrorResponse explains why a search can't run: invalid syntax, an
+ * unknown or unsupported keyword, or (in All cards) a collection-only keyword.
+ * Code is one of "syntax", "unsupported", "unknown_keyword", "invalid_value"
+ * or "collection_only".
+ * tygo:export
+ */
+export interface QueryErrorResponse {
+	error: string;
+	code: string;
+	keyword?: string;
+}
+
+//////////
 // source: constants.go
 
 /**

@@ -1,10 +1,12 @@
 package api
 
 import (
+	"backend/cardquery"
 	"backend/models"
 	"backend/scryfall"
 	"backend/services"
 	"backend/utils"
+	"fmt"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -103,6 +105,15 @@ func (h *SearchHandler) Search(c fiber.Ctx) error {
 
 	if query == "" {
 		return utils.ReturnError(c, fiber.StatusBadRequest, "query parameter 'q' is required")
+	}
+
+	// finish:, qty and free describe your copies; Scryfall can't answer them.
+	if keyword := cardquery.CollectionOnlyKeyword(query); keyword != "" {
+		return c.Status(fiber.StatusBadRequest).JSON(QueryErrorResponse{
+			Error:   fmt.Sprintf("`%s` only works in your collection", keyword),
+			Code:    "collection_only",
+			Keyword: keyword,
+		})
 	}
 
 	page := fiber.Query[int](c, "page", 1)

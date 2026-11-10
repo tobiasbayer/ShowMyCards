@@ -16,6 +16,7 @@ func InventoryRoutes(app *fiber.App, db *gorm.DB) {
 	inventory := app.Group("/api/inventory")
 	inventory.Get("/", handler.List)
 	inventory.Get("/cards", handler.ListAsCards)
+	inventory.Get("/search", handler.SearchCollection)
 	inventory.Get("/unassigned/count", handler.GetUnassignedCount)
 	inventory.Get("/by-oracle/:oracle_id", handler.ByOracle)
 	inventory.Get("/auto-location", handler.AutoLocation)

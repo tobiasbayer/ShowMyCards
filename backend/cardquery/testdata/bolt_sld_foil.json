@@ -1,0 +1,167 @@
+{
+ "all_parts": [
+  {
+   "component": "combo_piece",
+   "id": "a050f085-dc6a-4715-8cd3-33daf3e27bfc",
+   "name": "Lightning Bolt",
+   "type_line": "Instant",
+   "uri": "https://api.scryfall.com/cards/a050f085-dc6a-4715-8cd3-33daf3e27bfc"
+  },
+  {
+   "component": "combo_piece",
+   "id": "4f095067-cf24-4061-8626-dc68a66a0b36",
+   "name": "Toralf's Disciple",
+   "type_line": "Creature — Human Warrior",
+   "uri": "https://api.scryfall.com/cards/4f095067-cf24-4061-8626-dc68a66a0b36"
+  },
+  {
+   "component": "combo_piece",
+   "id": "69b51576-532b-450e-a8bf-0482cac04618",
+   "name": "Thayan Evokers",
+   "type_line": "Creature — Human Wizard",
+   "uri": "https://api.scryfall.com/cards/69b51576-532b-450e-a8bf-0482cac04618"
+  },
+  {
+   "component": "combo_piece",
+   "id": "618806ea-7ea8-4cfb-a8c1-c3defa34e7dd",
+   "name": "Indris, the Hydrostatic Surge",
+   "type_line": "Legendary Creature — Otter Incarnation",
+   "uri": "https://api.scryfall.com/cards/618806ea-7ea8-4cfb-a8c1-c3defa34e7dd"
+  }
+ ],
+ "artist": "Noah Bradley",
+ "booster": false,
+ "border_color": "black",
+ "card_faces": null,
+ "cmc": 1,
+ "collector_number": "83",
+ "color_identity": [
+  "R"
+ ],
+ "color_indicator": null,
+ "colors": [
+  "R"
+ ],
+ "defense": null,
+ "digital": false,
+ "edhrec_rank": 158,
+ "finishes": [
+  "foil"
+ ],
+ "flavor_text": null,
+ "foil": true,
+ "frame": "2015",
+ "frame_effects": [
+  "inverted"
+ ],
+ "full_art": false,
+ "game_changer": false,
+ "hand_modifier": null,
+ "highres_image": true,
+ "id": "45184cd7-b037-4a85-a063-e622ca928d17",
+ "illustration_id": "928b4c38-1997-4a49-8ce4-d5e0b7d98f4e",
+ "image_status": "highres_scan",
+ "image_updated_at": "2026-07-13T08:19:32Z",
+ "image_uris": {
+  "art": "https://cards.scryfall.io/art/front/4/5/45184cd7-b037-4a85-a063-e622ca928d17.webp?1783930772",
+  "art_crop": "https://cards.scryfall.io/art_crop/front/4/5/45184cd7-b037-4a85-a063-e622ca928d17.jpg?1783930772",
+  "border_crop": "https://cards.scryfall.io/border_crop/front/4/5/45184cd7-b037-4a85-a063-e622ca928d17.jpg?1783930772",
+  "crop": "https://cards.scryfall.io/crop/front/4/5/45184cd7-b037-4a85-a063-e622ca928d17.webp?1783930772",
+  "display": "https://cards.scryfall.io/display/front/4/5/45184cd7-b037-4a85-a063-e622ca928d17.webp?1783930772",
+  "grid": "https://cards.scryfall.io/grid/front/4/5/45184cd7-b037-4a85-a063-e622ca928d17.webp?1783930772",
+  "jpeg": "https://cards.scryfall.io/normal/front/4/5/45184cd7-b037-4a85-a063-e622ca928d17.jpg?1783930772",
+  "large": "https://cards.scryfall.io/large/front/4/5/45184cd7-b037-4a85-a063-e622ca928d17.jpg?1783930772",
+  "normal": "https://cards.scryfall.io/normal/front/4/5/45184cd7-b037-4a85-a063-e622ca928d17.jpg?1783930772",
+  "png": "https://cards.scryfall.io/png/front/4/5/45184cd7-b037-4a85-a063-e622ca928d17.png?1783930772",
+  "small": "https://cards.scryfall.io/small/front/4/5/45184cd7-b037-4a85-a063-e622ca928d17.jpg?1783930772",
+  "thumb": "https://cards.scryfall.io/thumb/front/4/5/45184cd7-b037-4a85-a063-e622ca928d17.webp?1783930772"
+ },
+ "keywords": [],
+ "lang": "en",
+ "layout": "normal",
+ "legalities": {
+  "alchemy": "not_legal",
+  "brawl": "legal",
+  "commander": "legal",
+  "duel": "legal",
+  "future": "not_legal",
+  "gladiator": "legal",
+  "historic": "banned",
+  "legacy": "legal",
+  "modern": "legal",
+  "oathbreaker": "legal",
+  "oldschool": "not_legal",
+  "pauper": "legal",
+  "paupercommander": "legal",
+  "penny": "not_legal",
+  "pioneer": "not_legal",
+  "predh": "legal",
+  "premodern": "legal",
+  "standard": "not_legal",
+  "standardbrawl": "not_legal",
+  "timeless": "legal",
+  "tlr": "legal",
+  "vintage": "legal"
+ },
+ "life_modifier": null,
+ "loyalty": null,
+ "mana_cost": "{R}",
+ "mtgo_id": 81077,
+ "multiverse_ids": [
+  485315
+ ],
+ "name": "Lightning Bolt",
+ "nonfoil": false,
+ "oracle_id": "4457ed35-7c10-48c8-9776-456485fdf070",
+ "oracle_text": "Lightning Bolt deals 3 damage to any target.",
+ "oversized": false,
+ "power": null,
+ "preview": {
+  "previewed_at": "2020-05-25",
+  "source": "Martin Jůza",
+  "source_uri": "https://twitter.com/MartinJuza/status/1265015690693664774"
+ },
+ "prices": {
+  "eur": "",
+  "eur_foil": "7.68",
+  "tix": "1.12",
+  "usd": "",
+  "usd_etched": "",
+  "usd_foil": "4.61"
+ },
+ "printed_name": null,
+ "printed_text": null,
+ "printed_type_line": null,
+ "prints_search_uri": "https://api.scryfall.com/cards/search?order=released&q=oracleid%3A4457ed35-7c10-48c8-9776-456485fdf070&unique=prints",
+ "produced_mana": null,
+ "promo": false,
+ "purchase_uris": {
+  "cardhoarder": "https://www.cardhoarder.com/cards/81077?affiliate_id=scryfall&ref=card-profile&utm_campaign=affiliate&utm_medium=card&utm_source=scryfall",
+  "cardmarket": "https://www.cardmarket.com/en/Magic/Products?idProduct=464574&referrer=scryfall&utm_campaign=card_prices&utm_medium=text&utm_source=scryfall",
+  "tcgplayer": "https://partner.tcgplayer.com/c/4931599/1830156/21018?subId1=api&u=https%3A%2F%2Fwww.tcgplayer.com%2Fproduct%2F214899%3Fpage%3D1"
+ },
+ "rarity": "rare",
+ "related_uris": {
+  "edhrec": "https://edhrec.com/route/?cc=Lightning+Bolt",
+  "gatherer": "https://gatherer.wizards.com/Pages/Card/Details.aspx?multiverseid=485315&printed=false",
+  "mtgtop8": "",
+  "tcgplayer_decks": ""
+ },
+ "released_at": "2020-06-04",
+ "reprint": true,
+ "reserved": false,
+ "rulings_uri": "https://api.scryfall.com/cards/45184cd7-b037-4a85-a063-e622ca928d17/rulings",
+ "scryfall_set_uri": "https://scryfall.com/sets/sld?utm_source=api",
+ "scryfall_uri": "https://scryfall.com/card/sld/83/lightning-bolt?utm_source=api",
+ "set": "sld",
+ "set_name": "Secret Lair Drop",
+ "set_search_uri": "https://api.scryfall.com/cards/search?order=set&q=e%3Asld&unique=prints",
+ "set_uri": "https://api.scryfall.com/sets/4d92a8a7-ccb0-437d-abdc-9d70fc5ed672",
+ "story_spotlight_number": null,
+ "story_spotlight_uri": null,
+ "tcgplayer_id": 214899,
+ "toughness": null,
+ "type_line": "Instant",
+ "uri": "https://api.scryfall.com/cards/45184cd7-b037-4a85-a063-e622ca928d17",
+ "watermark": null
+}

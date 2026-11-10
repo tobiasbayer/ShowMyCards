@@ -113,6 +113,8 @@ Requirements this places on the collection scopes:
 ## 4. Scryfall syntax on the collection: a local engine
 
 > Rewritten 2026-11-10. The earlier version proposed structured facets compiled to expr-lang, with no parser, because the user first wanted to avoid implementing Scryfall syntax locally. The user has since reversed that: Scryfall syntax should work on the collection too.
+>
+> **Built** on the prototype branch the same day: package `backend/cardquery`, endpoint `GET /api/inventory/search`. See "Local search engine" in the Prototype results for what was built, the exact semantics, and where it deviates from this section.
 
 - **Collection scopes** (My collection, a location, Unassigned) evaluate Scryfall syntax **locally**, in Go:
   - The query is parsed to an AST and evaluated directly over a per-printing struct.
@@ -220,7 +222,7 @@ The dashboard stays as the home page. Align the naming drift ("Storage Rules" vs
 ## Suggested order (coarse)
 
 1. **Vocabulary and safety net.** `CONTEXT.md`; include decks in export and backup; fix the deck-search typing bug.
-2. **Collection search engine** (added 2026-11-10, see §4).
+2. **Collection search engine** (added 2026-11-10, see §4). The engine and endpoint exist on the prototype branch ("Local search engine" below); this step moves them to `main` and points today's inventory pages at them.
    - **What it adds:** a collection endpoint that takes `q` and returns every matching owned printing once, with stacks and deck availability, plus the Go parser and evaluator, their unit tests and the comparison script.
    - **First users:** today's inventory pages. Their loaders switch to the endpoint, which ends the duplicate entries across pages, and their filter box accepts Scryfall syntax.
 3. **Backend `CardView` and overlay**, with local hydration of search results; regenerate types.
@@ -258,9 +260,11 @@ This section records what the user decided while trying the prototype of the uni
 ## Where the work is
 
 - **Branch:** `prototype/cards-page`, created from `main`. The user commits only when asked. Commits so far:
-  - `8d7c8c4` "search prototype, split between collection and catalog": the two-tab version, plus the backend card-text fields.
-  - `ebe70c9` "merge collection and catalog view": the scope dropdown and search on Enter.
-  - `b8761ad` "make prototype work with real data for further exploration": real writes, the backend additions, the default `/search` route and the Move menu.
+  - `8462802` "search prototype, split between collection and catalog": the two-tab version, plus the backend card-text fields.
+  - `c6ca00d` "merge collection and catalog view": the scope dropdown and search on Enter.
+  - `8eeda0a` "make prototype work with real data for further exploration": real writes, the backend additions, the default `/search` route and the Move menu.
+  - `6e5f78f` "docs: add proposal for card view convergence": this document.
+  - Not yet committed when written: the local search engine ("Local search engine" below).
 - **Run it:** `make dev-backend` and `make dev-frontend`, then open `http://localhost:5173/search`. On this branch `/search` **is** the Cards page, in dev and production builds alike, and `?variant=current` shows today's search page. A floating pill toggles between the two; ←/→ does the same when focus is not in an input.
 - **Writes are real** (since 2026-11-10; see "Usable on real data" below). Add copies with Undo, −/+, Move and Add to deck save to the backend.
 - **Losing variants:** the overlay-drawer and bottom-sheet variants were deleted before the first commit. A local, unversioned copy of all three variants, plus a patch of the tracked files at that point, is in `.scratch/cards-prototype-all-variants/` on the user's machine.
@@ -287,6 +291,7 @@ This section records what the user decided while trying the prototype of the uni
 | `frontend/src/lib/components/SearchControl.svelte` | In the prototype, the navbar search goes to the All cards scope (`source=catalog`) |
 | **Keep:** `backend/api/card_mapper.go`, `card_mapper_test.go`, `search.go`, `frontend/src/lib/types/api.ts`, `frontend/src/lib/utils/card-name.ts` | Real API additions; see "Backend changes" below |
 | **Keep:** `backend/api/inventory.go`, `inventory_merge_test.go`, `server/inventory_routes.go` | Create flags `merge`/`unassigned`, the auto-location preview and per-card availability; see "Usable on real data" below |
+| **Keep:** `backend/cardquery/` (+ tests, `testdata/`), `backend/api/collection_search.go` (+ test), the guard in `backend/api/search.go`, `backend/cmd/querycompare/` | The local Scryfall-syntax engine, `GET /api/inventory/search`, and the comparison tool; see "Local search engine" below |
 
 ## Decisions the user settled
 
@@ -464,7 +469,7 @@ The user wanted to use the prototype day to day on their real collection, deploy
 **Before deploying:** back up the SQLite file (`/app/data/database.db` in the `showmycards-data` volume, for example with `sqlite3 database.db ".backup backup.db"`). The JSON export and the scheduled backups don't include decks.
 
 **Still open:**
-- Collection search is name-only.
+- ~~Collection search is name-only.~~ Done: see "Local search engine".
 - Copies in deck-named storage locations count as free for decks.
 - Existing split stacks are only consolidated when moved.
 
@@ -483,6 +488,80 @@ The user reported that "Move to" in the detail panel did nothing. It took three 
 **Verified** with real clicks against a database copy: the menu opens; Esc and outside clicks close only the menu; moving a stack to another location and back left one row each time; the panel updated; no console errors.
 
 **User preference recorded:** no OS-native dropdown menus in this UI. Use the DaisyUI `dropdown` (or an in-app list like the Add popover's destination picker).
+
+## Local search engine (2026-11-10)
+
+The user asked to implement the local Scryfall syntax and to wire it into the prototype only (not today's inventory pages). The engine is its own package so it can move to `main` as "Suggested order" step 2.
+
+**Backend:**
+- **`backend/cardquery`** (no dependencies besides `golang.org/x/text`, promoted from indirect to direct for accent folding):
+  - `lexer.go` and `parser.go`: a recursive-descent parser to an AST. `or` binds weaker than the implicit AND, parentheses group, and `-` negates a term or a group.
+  - `card.go`: `Decode(raw)` builds the searchable `Card` from `cards.raw_json`, with folded (lowercase, accent-free) per-face strings. `Printing` adds the collection facts the caller sets: `Quantity` and `Finishes` in scope, `Free` (per card), `AddedAt`.
+  - `keywords.go`: the keyword registry. Each term compiles to a Go predicate at parse time, so bad values fail before any card is checked.
+  - `colors.go`, `mana.go`, `order.go`, `fold.go`, `errors.go`.
+  - Public API: `Parse`, `Query.Match`, `Query.Sort`, `CollectionOnlyKeyword`, `PricesFrom`, and `*Error{Code, Keyword, Pos, Message}`.
+- **`GET /api/inventory/search?q=&storage_location_id=`** (`backend/api/collection_search.go`):
+  - Scope: the location ID, `null` for Unassigned, or absent for everything. A printing is in scope when it has copies there; its result still carries all of its rows.
+  - It loads every inventory row and the owned cards' JSON in chunks of 500, decodes them on all cores, fills missing prices of localized printings from the English printing (as `BackfillEnglishPrices` does for display), then matches and sorts.
+  - Response: `CollectionSearchResponse {data: InventoryCard[], total_cards}`, with no paging. A rejected query returns 400 `QueryErrorResponse {error, code, keyword}`.
+- **All cards guard:** `/api/search` returns 400 `code: collection_only` for `finish:`, `qty` or `free` instead of sending them to Scryfall.
+- **`backend/cmd/querycompare`:** a manual tool. Start a backend, then run `go run ./cmd/querycompare -backend http://localhost:3000`. It compares each query in `queries.txt` with Scryfall, restricted to what you own:
+  - Plain lines compare cards (oracle IDs) through Scryfall's default search.
+  - Lines starting with `@prints ` compare printings in every language.
+  - Scryfall is asked with `include:extras`, because the collection holds tokens. It is queried at 1 request/s, and queries over 10 pages are skipped.
+
+**Semantics** (verified against Scryfall's docs and live API before building):
+- Case and accents are ignored everywhere. Names, type lines and rules text match English **or** printed (localized) text, on any face.
+- `o:` matches per line with reminder text removed; `fo:` keeps reminder text. `~` stands for the face's name, a legendary card's short name ("Kamahl" for "Kamahl, Pit Fighter"), or a self-reference such as "this creature" or "this spell". The last two were found by the comparison script.
+- `c:` means "includes these colours" and falls back to the front face on two-faced cards. `id:` means "fits within these colours". Both take letters, names, guild/shard/wedge/college/four-colour nicknames, `c`, `m` and counts.
+- `m:` is a multiset comparison: generic mana compares as a number, and hybrid and Phyrexian symbols are their own symbols. Multi-face cards compare each face's cost, not the joined cost.
+- `pow`/`tou`/`loy`/`pt` check any face. `*` counts as 0, a missing value never matches (not even `!=`), and `pow>tou` compares within a face.
+- `usd`/`eur` fall back to the foil and then the etched price (as on Scryfall), after the English-printing fallback.
+- `f:` matches legal or restricted. `is:commander` checks the front face (a legendary creature, vehicle, spacecraft or background, or "can be your commander"), and the card must not be banned in Commander.
+- Also supported beyond §4's list: `fo:`, `name:`, `not:`, `pt`, `wm:`, `border:`, `frame:`, `has:watermark`, `banned:`, `restricted:`, `ci:` and `l:`.
+- Collection keywords: `finish:` and `qty` count only copies **in the current scope** (what the tile shows). `free` is per card, like the deck badge.
+- Sort: newest added first by default. `order:` takes name, set, released (newest first), rarity, color, usd/eur/tix (missing prices last), cmc/mv, power, toughness, edhrec and artist, with `direction:asc|desc`.
+
+**Deliberate differences from Scryfall:**
+- Unknown values (format, rarity, layout, language, `is:`, `order:`) are errors. Scryfall silently ignores such terms.
+- The collection hides nothing by default: no language filter, and tokens and other extras are included.
+- `kw:` is an exact match, and its values aren't validated (there is no keyword list).
+- `game:` and `st:` are unsupported. The stored `raw_json` is re-marshalled from go-scryfall's struct, which drops `games` and `set_type`. It also drops `flavor_name`, `security_stamp` and per-face `artist`/`watermark`.
+
+**Errors** (one line, plus a link where the other scope helps):
+
+| Code | When | Example | Link |
+|---|---|---|---|
+| `unsupported` | Scryfall-only keywords (tags, `cube:`, `unique:`, `date`, regex, unknown `is:` values, …) | "`art:` isn't available in your collection" | Search All cards instead |
+| `collection_only` | `finish:`/`qty`/`free` in All cards | "`qty` only works in your collection" | Search My collection instead |
+| `unknown_keyword` | anything else with an operator | "`foo:` isn't a search keyword" | — |
+| `invalid_value` | a bad value or operator | "Couldn't read `mv<=`: expected a number" | — |
+| `syntax` | quotes, parentheses, a stray `or` or `-` | "Missing closing parenthesis" | — |
+
+Other Scryfall errors in All cards show "Scryfall couldn't read this search" (or Scryfall's first warning).
+
+**Frontend (prototype):**
+- The collection scopes load from the endpoint in `+page.server.ts`. Every search (Enter) and every scope change goes through the server load.
+- The client-side name filter is gone. `filteredCollection` keeps only the location check, so a card moved out of the shown location disappears.
+- `queryError` holds the error; `CardGrid` shows the line (backticks render as code) and the link.
+- The placeholder reads "Search your cards (Scryfall syntax)".
+- After a write, a card stays visible until the next search even if it no longer matches (for example "−" under `qty>=2`).
+
+**Verified:**
+- **Unit tests:** 116 matching cases over 19 real fixture cards (`cardquery/testdata/`, exported from the local catalog), plus error codes, sorting, folding and prices.
+- **Handler tests:** scopes, scoped `finish:`/`qty`, `free`, the English price fallback, all rows per printing, the error bodies and the All cards guard.
+- **Timing on a copy of a real database** (about 1,200 owned printings): narrow queries take about 60 ms; the empty query (every printing) about 100 ms warm. Building results was the cost (three JSON passes per card in `ToScryfallCard`), so decoding runs on all cores; before that, the empty query took about 370 ms. For comparison, the old `fetchAllInventoryCards` path needed about 0.7 s for its page requests.
+- **Comparison with Scryfall on that data:** all 50 queries in `queries.txt` agree. The first run found two real differences, both fixed: tokens (resolved by adding `include:extras` in the tool), and `~` for short names and "this creature".
+- **In Chrome against the copy:**
+  - Searches on Enter: `t:dragon` matched tokens and a German printing.
+  - The `art:` line and its link rerun the query in All cards.
+  - The `qty>=2` line in All cards links back to My collection, and the results there are correct.
+  - The `mv<=` message is shown.
+  - A scope change keeps the query, and the counter equals the copies in that location.
+  - Unassigned matches the storage overview's count.
+  - No console errors.
+  - Writes were not re-tested; their code is unchanged.
+- **Checks:** backend tests pass with `-race`, and lint shows only the 12 existing `errcheck` findings. svelte-check: 0 errors. The 279 server tests pass, and the production build succeeds.
 
 ## Facts found (code and data)
 
@@ -506,6 +585,7 @@ The user reported that "Move to" in the detail panel did nothing. It took three 
   - Split: 2 faces.
   
   The per-face English fallback covers these.
+- **Scryfall lacks German type lines for recent sets.** Whole sets have no `printed_type_line` on their German printings (for example ECL, ECC, FRA, SOS, SPM, HOB), although `printed_name` and `printed_text` are there. On one real collection about 45% of German printings lacked it. A German `t:` search (`t:drache`) misses those cards; an English `t:` always works.
 - **Placeholder images:** many German printings use Scryfall's "Localized Image Not Available" placeholder. That is Scryfall data, not an app bug.
 - **New copies don't join existing stacks.** On a real collection about 14% of stacks (printing + finish + location) were split across several inventory rows, up to 10, because `POST /api/inventory` always inserted. The prototype's `merge` flag stops new splits; Move consolidates the stack it moves.
 - **Physical decks modelled as storage locations.** Some users keep a storage location per physical deck (for example one per Commander deck). The allocation service counts only demand from the Decks feature, so **copies sitting in such a location still count as "free for decks"**. This needs a decision during the decks/lists merge: link a deck to a location, or count those copies as committed.
@@ -517,6 +597,7 @@ The user reported that "Move to" in the detail panel did nothing. It took three 
 - **"In decks" section:** should it also show the free and committed counts? Not requested yet.
 - **Image format:** consider a larger Scryfall image format now that tiles are bigger.
 - **Face rule:** the rule between faces in the panel text is faint in the dark theme.
+- **Collection queries on today's inventory pages:** the endpoint could replace `fetchAllInventoryCards` and the name/set filter box there (proposal step 2). Not wired yet, by the user's choice.
 - **The scope dropdown in the header is still a native `<select>`,** so it opens the OS menu the user disliked for Move. Switch it to the DaisyUI dropdown too?
 - **Duplicate location names:** locations can share a name (for example a binder and a box both called "A1"), and the Move menu, the scope dropdown and the Add popover can't tell them apart. The older `StorageLocationDropdown` prefixes 📖 (binder) or 📦 (box). Show the storage type, or require unique names?
 

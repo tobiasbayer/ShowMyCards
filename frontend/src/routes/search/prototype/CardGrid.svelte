@@ -27,7 +27,25 @@
 	});
 </script>
 
-{#if view.error}
+{#if view.queryError}
+	<!-- One line on why the search can't run, with the other scope when that one can. -->
+	<div class="py-16 text-center text-sm text-base-content/70">
+		<p>
+			{#each view.queryError.message.split('`') as part, i (i)}
+				{#if i % 2}<code>{part}</code>{:else}{part}{/if}
+			{/each}
+		</p>
+		{#if view.queryError.code === 'unsupported'}
+			<button class="btn btn-link btn-sm" onclick={() => view.setScope('catalog', view.query)}>
+				Search All cards instead
+			</button>
+		{:else if view.queryError.code === 'collection_only'}
+			<button class="btn btn-link btn-sm" onclick={() => view.setScope('all', view.query)}>
+				Search My collection instead
+			</button>
+		{/if}
+	</div>
+{:else if view.error}
 	<p class="py-16 text-center text-sm text-error">{view.error}</p>
 {:else if view.source === 'catalog' && !view.query.trim()}
 	<div class="py-24 text-center">

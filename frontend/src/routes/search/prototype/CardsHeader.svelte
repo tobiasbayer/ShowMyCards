@@ -15,14 +15,11 @@
 	// Seeded once: the header is recreated with each view (see VariantPush).
 	let draft = $state(untrack(() => view.query));
 
+	// Every scope searches on the server: Scryfall for All cards, the local engine otherwise.
 	function onSubmit(event: SubmitEvent) {
 		event.preventDefault();
-		if (view.scope === 'catalog') {
-			view.query = draft;
-			view.navigate('catalog');
-		} else {
-			view.setQuery(draft);
-		}
+		view.query = draft;
+		view.navigate(view.source);
 	}
 
 	function onScope(value: string) {
@@ -35,7 +32,7 @@
 
 	// Collection counts copies (as the storage overview does); All cards shows Scryfall's total.
 	const count = $derived(
-		view.error
+		view.error || view.queryError
 			? 0
 			: inCollection
 				? view.collectionCopies
@@ -53,7 +50,7 @@
 			<input
 				type="search"
 				bind:value={draft}
-				placeholder={inCollection ? 'Search your cards' : 'Search all cards'}
+				placeholder={inCollection ? 'Search your cards (Scryfall syntax)' : 'Search all cards'}
 				aria-label={inCollection ? 'Search your cards' : 'Search all cards'}
 				autocomplete="off" />
 			{#if navigating.to}

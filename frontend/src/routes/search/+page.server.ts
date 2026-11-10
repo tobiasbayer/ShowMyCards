@@ -1,8 +1,10 @@
 import {
 	BACKEND_URL,
+	type CollectionSearchResponse,
 	type DeckAvailability,
 	type EnhancedCardResult,
 	type InventoryCard,
+	type QueryErrorResponse,
 	type SearchResponse
 } from '$lib';
 import {
@@ -28,9 +30,9 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 	return { storageLocations, defaultLanguage, proto };
 };
 
-// PROTOTYPE, throwaway: Collection loads every owned printing (filtered client-side);
-// Catalog loads the first Scryfall page for `q`. Both read deck availability per
-// card from the inventory endpoint, which is the only one that serves it.
+// PROTOTYPE, throwaway: Collection runs the query (Scryfall syntax) on the backend's
+// local engine over the owned printings in the chosen scope; Catalog loads the first
+// Scryfall page for `q`. Both read deck availability per card from inventory results.
 async function loadPrototype(fetch: typeof globalThis.fetch, url: URL): Promise<ProtoData> {
 	const source = url.searchParams.get('source') === 'catalog' ? 'catalog' : 'collection';
 	const query = url.searchParams.get('q')?.trim() ?? '';
@@ -40,17 +42,32 @@ async function loadPrototype(fetch: typeof globalThis.fetch, url: URL): Promise<
 		collection: [],
 		catalog: { cards: [], hasMore: false, total: 0 },
 		availability: {},
-		error: null
+		error: null,
+		queryError: null
 	};
 	try {
-		// Catalog only needs the collection for the deck badge, so a failure there just hides it.
-		const collection =
-			source === 'collection'
-				? fetchAllInventoryCards(fetch)
-				: fetchAllInventoryCards(fetch).catch(() => []);
 		if (source === 'collection') {
-			data.collection = await collection;
-		} else if (query) {
+			const params = new URLSearchParams();
+			if (query) params.set('q', query);
+			const location = url.searchParams.get('location');
+			if (location === 'unassigned') params.set('storage_location_id', 'null');
+			else if (location && /^\d+$/.test(location)) params.set('storage_location_id', location);
+			const response = await fetch(`${BACKEND_URL}/api/inventory/search?${params}`);
+			if (response.ok) {
+				const result: CollectionSearchResponse = await response.json();
+				data.collection = result.data ?? [];
+				data.availability = availabilityByOracle(data.collection);
+			} else if (response.status === 400) {
+				data.queryError = await readQueryError(response);
+			} else {
+				data.error = `Search failed (HTTP ${response.status})`;
+			}
+			return data;
+		}
+
+		// Catalog only needs the collection for the deck badge, so a failure there just hides it.
+		const collection = fetchAllInventoryCards(fetch).catch(() => []);
+		if (query) {
 			const response = await fetch(`${BACKEND_URL}/api/search?q=${encodeURIComponent(query)}`);
 			if (response.ok) {
 				const result: SearchResponse = await response.json();
@@ -59,6 +76,8 @@ async function loadPrototype(fetch: typeof globalThis.fetch, url: URL): Promise<
 					hasMore: result.has_more,
 					total: result.total_cards
 				};
+			} else if (response.status === 400) {
+				data.queryError = await readQueryError(response);
 			} else if (response.status !== 404) {
 				data.error = `Search failed (HTTP ${response.status})`;
 			}
@@ -70,6 +89,29 @@ async function loadPrototype(fetch: typeof globalThis.fetch, url: URL): Promise<
 	}
 	return data;
 }
+
+/**
+ * A search the backend rejected: the local engine's message, a collection keyword
+ * used in All cards, or a query Scryfall couldn't read.
+ */
+async function readQueryError(response: Response): Promise<{ message: string; code: string }> {
+	const body = (await response.json().catch(() => ({}))) as Partial<
+		QueryErrorResponse & { warnings: string[] }
+	>;
+	if (body.error && body.code && queryErrorCodes.has(body.code)) {
+		return { message: body.error, code: body.code };
+	}
+	return { message: body.warnings?.[0] ?? "Scryfall couldn't read this search", code: 'syntax' };
+}
+
+/** Codes whose message is written for people (see backend api.QueryErrorResponse). */
+const queryErrorCodes = new Set([
+	'syntax',
+	'unsupported',
+	'unknown_keyword',
+	'invalid_value',
+	'collection_only'
+]);
 
 function availabilityByOracle(cards: EnhancedCardResult[]): Record<string, DeckAvailability> {
 	const byOracle: Record<string, DeckAvailability> = {};

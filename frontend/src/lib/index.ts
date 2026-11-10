@@ -157,7 +157,9 @@ export type {
 	StorageLocationWithCount,
 	InventoryCardsResponse,
 	InventoryCard,
-	DeckAvailability
+	DeckAvailability,
+	CollectionSearchResponse,
+	QueryErrorResponse
 } from './types/api-runtime';
 
 // Re-export list-related API types

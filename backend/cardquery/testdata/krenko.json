@@ -1,0 +1,153 @@
+{
+ "all_parts": [
+  {
+   "component": "token",
+   "id": "0e67efea-8a80-42ec-8e77-07d387d933d4",
+   "name": "Goblin",
+   "type_line": "Token Creature — Goblin",
+   "uri": "https://api.scryfall.com/cards/0e67efea-8a80-42ec-8e77-07d387d933d4"
+  },
+  {
+   "component": "combo_piece",
+   "id": "aa078518-0ce2-4c6f-9061-aa7e22ed7493",
+   "name": "Krenko, Mob Boss",
+   "type_line": "Legendary Creature — Goblin Warrior",
+   "uri": "https://api.scryfall.com/cards/aa078518-0ce2-4c6f-9061-aa7e22ed7493"
+  }
+ ],
+ "artist": "Karl Kopinski",
+ "booster": true,
+ "border_color": "black",
+ "card_faces": null,
+ "cmc": 4,
+ "collector_number": "138",
+ "color_identity": [
+  "R"
+ ],
+ "color_indicator": null,
+ "colors": [
+  "R"
+ ],
+ "defense": null,
+ "digital": false,
+ "edhrec_rank": 1090,
+ "finishes": [
+  "nonfoil",
+  "foil"
+ ],
+ "flavor_text": "\"He displays a perverse charisma fueled by avarice. Highly dangerous. Recommend civil sanctions.\"\n—Agmand Sarv, Azorius hussar",
+ "foil": true,
+ "frame": "2003",
+ "frame_effects": null,
+ "full_art": false,
+ "game_changer": false,
+ "hand_modifier": null,
+ "highres_image": true,
+ "id": "aa078518-0ce2-4c6f-9061-aa7e22ed7493",
+ "illustration_id": "284afff8-9007-4791-99a8-6854a7c40c02",
+ "image_status": "highres_scan",
+ "image_updated_at": "2026-07-13T11:01:22Z",
+ "image_uris": {
+  "art": "https://cards.scryfall.io/art/front/a/a/aa078518-0ce2-4c6f-9061-aa7e22ed7493.webp?1783940482",
+  "art_crop": "https://cards.scryfall.io/art_crop/front/a/a/aa078518-0ce2-4c6f-9061-aa7e22ed7493.jpg?1783940482",
+  "border_crop": "https://cards.scryfall.io/border_crop/front/a/a/aa078518-0ce2-4c6f-9061-aa7e22ed7493.jpg?1783940482",
+  "crop": "https://cards.scryfall.io/crop/front/a/a/aa078518-0ce2-4c6f-9061-aa7e22ed7493.webp?1783940482",
+  "display": "https://cards.scryfall.io/display/front/a/a/aa078518-0ce2-4c6f-9061-aa7e22ed7493.webp?1783940482",
+  "grid": "https://cards.scryfall.io/grid/front/a/a/aa078518-0ce2-4c6f-9061-aa7e22ed7493.webp?1783940482",
+  "jpeg": "https://cards.scryfall.io/normal/front/a/a/aa078518-0ce2-4c6f-9061-aa7e22ed7493.jpg?1783940482",
+  "large": "https://cards.scryfall.io/large/front/a/a/aa078518-0ce2-4c6f-9061-aa7e22ed7493.jpg?1783940482",
+  "normal": "https://cards.scryfall.io/normal/front/a/a/aa078518-0ce2-4c6f-9061-aa7e22ed7493.jpg?1783940482",
+  "png": "https://cards.scryfall.io/png/front/a/a/aa078518-0ce2-4c6f-9061-aa7e22ed7493.png?1783940482",
+  "small": "https://cards.scryfall.io/small/front/a/a/aa078518-0ce2-4c6f-9061-aa7e22ed7493.jpg?1783940482",
+  "thumb": "https://cards.scryfall.io/thumb/front/a/a/aa078518-0ce2-4c6f-9061-aa7e22ed7493.webp?1783940482"
+ },
+ "keywords": [],
+ "lang": "en",
+ "layout": "normal",
+ "legalities": {
+  "alchemy": "legal",
+  "brawl": "legal",
+  "commander": "legal",
+  "duel": "legal",
+  "future": "legal",
+  "gladiator": "legal",
+  "historic": "legal",
+  "legacy": "legal",
+  "modern": "legal",
+  "oathbreaker": "legal",
+  "oldschool": "not_legal",
+  "pauper": "not_legal",
+  "paupercommander": "not_legal",
+  "penny": "legal",
+  "pioneer": "legal",
+  "predh": "not_legal",
+  "premodern": "not_legal",
+  "standard": "legal",
+  "standardbrawl": "legal",
+  "timeless": "legal",
+  "tlr": "not_legal",
+  "vintage": "legal"
+ },
+ "life_modifier": null,
+ "loyalty": null,
+ "mana_cost": "{2}{R}{R}",
+ "mtgo_foil_id": 45579,
+ "mtgo_id": 45578,
+ "multiverse_ids": [
+  253712
+ ],
+ "name": "Krenko, Mob Boss",
+ "nonfoil": true,
+ "oracle_id": "68418069-f615-40ef-ae0d-764192acae00",
+ "oracle_text": "{T}: Create X 1/1 red Goblin creature tokens, where X is the number of Goblins you control.",
+ "oversized": false,
+ "power": "3",
+ "preview": {
+  "previewed_at": null,
+  "source": "",
+  "source_uri": ""
+ },
+ "prices": {
+  "eur": "1.66",
+  "eur_foil": "3.37",
+  "tix": "0.02",
+  "usd": "3.05",
+  "usd_etched": "",
+  "usd_foil": "3.53"
+ },
+ "printed_name": null,
+ "printed_text": null,
+ "printed_type_line": null,
+ "prints_search_uri": "https://api.scryfall.com/cards/search?order=released&q=oracleid%3A68418069-f615-40ef-ae0d-764192acae00&unique=prints",
+ "produced_mana": null,
+ "promo": false,
+ "purchase_uris": {
+  "cardhoarder": "https://www.cardhoarder.com/cards/45578?affiliate_id=scryfall&ref=card-profile&utm_campaign=affiliate&utm_medium=card&utm_source=scryfall",
+  "cardmarket": "https://www.cardmarket.com/en/Magic/Products?idProduct=256653&referrer=scryfall&utm_campaign=card_prices&utm_medium=text&utm_source=scryfall",
+  "tcgplayer": "https://partner.tcgplayer.com/c/4931599/1830156/21018?subId1=api&u=https%3A%2F%2Fwww.tcgplayer.com%2Fproduct%2F59784%3Fpage%3D1"
+ },
+ "rarity": "rare",
+ "related_uris": {
+  "edhrec": "https://edhrec.com/route/?cc=Krenko%2C+Mob+Boss",
+  "gatherer": "https://gatherer.wizards.com/Pages/Card/Details.aspx?multiverseid=253712&printed=false",
+  "mtgtop8": "",
+  "tcgplayer_decks": ""
+ },
+ "released_at": "2012-07-13",
+ "reprint": false,
+ "reserved": false,
+ "rulings_uri": "https://api.scryfall.com/cards/aa078518-0ce2-4c6f-9061-aa7e22ed7493/rulings",
+ "scryfall_set_uri": "https://scryfall.com/sets/m13?utm_source=api",
+ "scryfall_uri": "https://scryfall.com/card/m13/138/krenko-mob-boss?utm_source=api",
+ "set": "m13",
+ "set_name": "Magic 2013",
+ "set_search_uri": "https://api.scryfall.com/cards/search?order=set&q=e%3Am13&unique=prints",
+ "set_uri": "https://api.scryfall.com/sets/f9b0c6f4-8a4f-4f36-ad3c-e1e16fb8535d",
+ "story_spotlight_number": null,
+ "story_spotlight_uri": null,
+ "tcgplayer_id": 59784,
+ "toughness": "3",
+ "type_line": "Legendary Creature — Goblin Warrior",
+ "uri": "https://api.scryfall.com/cards/aa078518-0ce2-4c6f-9061-aa7e22ed7493",
+ "watermark": null
+}

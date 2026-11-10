@@ -52,5 +52,16 @@ export interface SearchResponse extends Omit<Generated.SearchResponse, 'data'> {
 	data: InventoryCard[];
 }
 
+// Collection search results with runtime-accurate card results
+export interface CollectionSearchResponse extends Omit<Generated.CollectionSearchResponse, 'data'> {
+	data: InventoryCard[];
+}
+
 // Re-export other generated types as-is
-export type { CardResult, CardPrices, EvaluateRequest, DeckAvailability } from './api';
+export type {
+	CardResult,
+	CardPrices,
+	EvaluateRequest,
+	DeckAvailability,
+	QueryErrorResponse
+} from './api';

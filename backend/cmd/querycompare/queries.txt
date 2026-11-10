@@ -1,0 +1,72 @@
+# Queries for comparing the local collection search with Scryfall.
+# One query per line; blank lines and lines starting with # are skipped.
+# Plain queries compare cards (oracle IDs) using Scryfall's default search.
+# "@prints " compares printings in every language: use it for keywords about
+# a printing (set, number, language, artist, price, frame) and keep it narrow.
+# Scryfall is queried at 1 request/s; queries over the page limit are skipped.
+
+# Names
+!"Lightning Bolt"
+goblin
+
+# Type and text
+t:goblin t:legendary
+t:dragon c:r
+t:equipment
+o:"draw a card" t:instant
+o:"~ deals 3 damage"
+o:"enters tapped" t:land
+kw:flash t:creature
+kw:deathtouch
+
+# Colour, identity, mana
+c=wu
+c:temur
+c:c t:creature
+c:m t:creature mv<=2
+id<=esper t:legendary t:creature mv<=2
+id:c t:artifact mv>=4
+m:{R/W}
+m=2WW
+m:rr t:creature
+m:{U/P}
+mv>=8
+mv:odd t:planeswalker
+
+# Stats
+pow>=7
+pow>tou t:creature c:u
+pow=0 t:creature
+pt>=12
+loy>=5
+
+# Legality
+f:pauper t:goblin
+banned:commander
+restricted:vintage
+-f:modern t:instant c:u
+
+# Layout and is:
+is:commander c:g id=g
+is:mdfc
+is:transform t:legendary
+is:adventure
+is:split
+layout:saga
+is:reserved t:creature
+
+# Grammar
+(t:elf or t:goblin) t:legendary
+-t:creature c:u kw:flash
+t:creature -(c:r or c:g or c:w) mv<=1
+
+# Printings
+@prints !"Lightning Bolt"
+@prints !"Sol Ring"
+@prints s:znr r:mythic
+@prints s:m11 r:rare
+@prints cn<10 s:m21
+@prints a:"rebecca guay" t:enchantment
+@prints frame:1997 t:dragon
+@prints usd>20 lang:en t:creature r:mythic
+@prints year<=1995 t:creature c:b lang:en

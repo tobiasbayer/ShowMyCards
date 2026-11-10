@@ -19,6 +19,7 @@ ShowMyCards/
 │   ├── main.go                  # Application entry point, graceful shutdown handling
 │   ├── api/                     # HTTP handlers
 │   │   ├── bulk_data.go         # Bulk data import operations
+│   │   ├── collection_search.go # Collection search (Scryfall syntax, local engine)
 │   │   ├── dashboard.go         # Dashboard statistics
 │   │   ├── health.go            # Health check endpoint
 │   │   ├── inventory.go         # Inventory CRUD + batch operations + resort
@@ -46,6 +47,8 @@ ShowMyCards/
 │   │   ├── converter.go         # Scryfall card to rule data conversion
 │   │   ├── evaluator.go         # expr-lang based rule evaluator
 │   │   └── evaluator_test.go    # Rule evaluation tests
+│   ├── cardquery/               # Local Scryfall-syntax engine (parser, keywords, sort)
+│   ├── cmd/querycompare/        # Manual tool: compare collection search with Scryfall
 │   ├── scryfall/                # Scryfall API client
 │   │   └── client.go            # HTTP client for Scryfall API
 │   ├── server/                  # Server setup and routing
@@ -203,6 +206,10 @@ Go types are mapped to TypeScript as follows:
 - `GET /api/inventory/cards` - List inventory as enhanced card results with Scryfall data
   - Query params: `page`, `page_size`, `storage_location_id`
 - `GET /api/inventory/by-oracle/:oracle_id` - Get all printings of a card by oracle ID
+- `GET /api/inventory/search` - Search owned printings with Scryfall syntax, evaluated locally
+  (package `cardquery`); every match in one response, newest first unless `order:`
+  - Query params: `q`, `storage_location_id` (or "null" for unassigned; absent = everything)
+  - Invalid or unsupported queries return 400 `{error, code, keyword}`
 - `GET /api/inventory/unassigned/count` - Count inventory items without storage location
 - `POST /api/inventory/batch/move` - Batch move items to a storage location
 - `DELETE /api/inventory/batch` - Batch delete inventory items
@@ -263,6 +270,7 @@ Go types are mapped to TypeScript as follows:
 
 - `GET /api/search` - Search cards via Scryfall with inventory data
   - Query params: `q` (search query), `page` (default: 1)
+  - Collection keywords (`finish:`, `qty`, `free`) return 400 `code: collection_only`
   - Returns enhanced results with inventory info (this printing, other printings)
 - `GET /api/search/:id` - Get single card by Scryfall ID
 
