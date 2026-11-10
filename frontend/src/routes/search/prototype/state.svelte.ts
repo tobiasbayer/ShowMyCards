@@ -15,6 +15,11 @@ import type {
 
 export type Source = 'collection' | 'catalog';
 export type LocationFilter = 'all' | 'unassigned' | number;
+/**
+ * The scope dropdown: `catalog` is "All cards" (Scryfall); a LocationFilter is
+ * the collection (`all` = every location, `unassigned`, or one location id).
+ */
+export type Scope = 'catalog' | LocationFilter;
 
 /** Data the server load hands to the prototype (see ../+page.server.ts). */
 export interface ProtoData {
@@ -295,7 +300,23 @@ export class CardsView {
 		return new URLSearchParams(window.location.search);
 	}
 
-	/** Collection filters live and only mirrors the URL (no reload). */
+	scope = $derived<Scope>(this.source === 'catalog' ? 'catalog' : this.location);
+
+	/** Applies a scope from the dropdown and reruns `query` in it. */
+	setScope(scope: Scope, query: string) {
+		this.query = query;
+		if (scope === 'catalog') {
+			this.navigate('catalog', 'all');
+		} else if (this.source === 'catalog') {
+			// The collection is loaded by the server load, so leaving Scryfall navigates.
+			this.navigate('collection', scope);
+		} else {
+			this.setLocation(scope);
+			this.setQuery(query);
+		}
+	}
+
+	/** Collection filtering is client-side and only mirrors the URL (no reload). */
 	setQuery(q: string) {
 		this.query = q;
 		if (this.source !== 'collection') return;
@@ -316,9 +337,11 @@ export class CardsView {
 	}
 
 	/** Source switches and catalog searches go through the server load. */
-	navigate(source: Source) {
+	navigate(source: Source, location?: LocationFilter) {
 		const params = this.#params();
 		params.set('source', source);
+		if (location === 'all') params.delete('location');
+		else if (location !== undefined) params.set('location', String(location));
 		if (this.query) params.set('q', this.query);
 		else params.delete('q');
 		goto(resolve(searchPath(params) as '/search'), { keepFocus: true, noScroll: true });
