@@ -58,10 +58,17 @@ type CardPrices struct {
 // CardResult represents a card in search results
 // tygo:export
 type CardResult struct {
-	ID              string     `json:"id"`
-	OracleID        string     `json:"oracle_id"`
-	Name            string     `json:"name"`
-	PrintedName     *string    `json:"printed_name,omitempty"`
+	ID          string  `json:"id"`
+	OracleID    string  `json:"oracle_id"`
+	Name        string  `json:"name"`
+	PrintedName *string `json:"printed_name,omitempty"`
+	// OracleText is the English Oracle text. Multi-face cards join their faces'
+	// text with a "\n//\n" line, in face order.
+	OracleText string `json:"oracle_text,omitempty"`
+	// PrintedText is the text as printed on a non-English card, in its
+	// language, joined across faces like OracleText. Empty for English cards
+	// and when Scryfall has no localized text.
+	PrintedText     string     `json:"printed_text,omitempty"`
 	SetCode         string     `json:"set_code,omitempty"`
 	SetName         string     `json:"set_name,omitempty"`
 	CollectorNumber string     `json:"collector_number,omitempty"`

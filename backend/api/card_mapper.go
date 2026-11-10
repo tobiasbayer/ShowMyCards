@@ -4,6 +4,7 @@ import (
 	"backend/models"
 	"backend/utils"
 	"log/slog"
+	"strings"
 
 	scryfall "github.com/BlueMonday/go-scryfall"
 	"gorm.io/gorm"
@@ -126,12 +127,93 @@ func ResolveEnglishPrices(db *gorm.DB, cards map[string]scryfall.Card) map[strin
 
 // BuildCardResult creates a CardResult from a Scryfall card, extracting all
 // display fields and converting enum types to strings.
+// Multi-face cards (transform, modal double-faced, split, adventure, ...)
+// carry their names and text per face rather than on the card. These helpers
+// fall back to the faces, joined in face order: names with " // " (as Scryfall
+// joins the English name) and text with a "//" line.
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+// joinFaces returns the non-empty values pick finds on the card's faces,
+// joined with sep, or "" when there are none.
+func joinFaces(card scryfall.Card, sep string, pick func(scryfall.CardFace) string) string {
+	var parts []string
+	for _, face := range card.CardFaces {
+		if v := pick(face); v != "" {
+			parts = append(parts, v)
+		}
+	}
+	return strings.Join(parts, sep)
+}
+
+// joinLocalizedFaces joins each face's localized value, using the face's
+// English value where Scryfall has no translation (the second face of
+// adventure and prepare cards often lacks one), so no face is dropped. It
+// returns "" when no face is localized at all.
+func joinLocalizedFaces(card scryfall.Card, sep string, localized func(scryfall.CardFace) *string, english func(scryfall.CardFace) string) string {
+	var parts []string
+	anyLocalized := false
+	for _, face := range card.CardFaces {
+		if v := deref(localized(face)); v != "" {
+			parts = append(parts, v)
+			anyLocalized = true
+		} else if e := english(face); e != "" {
+			parts = append(parts, e)
+		}
+	}
+	if !anyLocalized {
+		return ""
+	}
+	return strings.Join(parts, sep)
+}
+
+// cardOracleText returns the card's English Oracle text.
+func cardOracleText(card scryfall.Card) string {
+	if card.OracleText != "" {
+		return card.OracleText
+	}
+	return joinFaces(card, "\n//\n", func(f scryfall.CardFace) string { return deref(f.OracleText) })
+}
+
+// cardPrintedText returns the text as printed on a non-English card, in its
+// language. Scryfall leaves it unset on English cards.
+func cardPrintedText(card scryfall.Card) string {
+	if v := deref(card.PrintedText); v != "" {
+		return v
+	}
+	return joinLocalizedFaces(card, "\n//\n",
+		func(f scryfall.CardFace) *string { return f.PrintedText },
+		func(f scryfall.CardFace) string { return deref(f.OracleText) })
+}
+
+// cardPrintedName returns the localized name of a non-English card, or nil
+// when Scryfall has none (always for English cards).
+func cardPrintedName(card scryfall.Card) *string {
+	if v := deref(card.PrintedName); v != "" {
+		return card.PrintedName
+	}
+	name := joinLocalizedFaces(card, " // ",
+		func(f scryfall.CardFace) *string { return f.PrintedName },
+		func(f scryfall.CardFace) string { return f.Name })
+	if name == "" {
+		return nil
+	}
+	return &name
+}
+
 func BuildCardResult(card scryfall.Card) CardResult {
 	return CardResult{
 		ID:              card.ID,
 		OracleID:        card.OracleID,
 		Name:            card.Name,
-		PrintedName:     card.PrintedName,
+		PrintedName:     cardPrintedName(card),
+		OracleText:      cardOracleText(card),
+		PrintedText:     cardPrintedText(card),
 		SetCode:         card.Set,
 		SetName:         card.SetName,
 		CollectorNumber: card.CollectorNumber,

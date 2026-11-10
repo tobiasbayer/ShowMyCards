@@ -126,6 +126,120 @@ func TestBuildCardResult_PrintedName(t *testing.T) {
 	}
 }
 
+func TestBuildCardResult_OracleText(t *testing.T) {
+	front, back := "Flying", "Draw a card."
+	tests := []struct {
+		name string
+		card scryfall.Card
+		want string
+	}{
+		{
+			name: "single face",
+			card: scryfall.Card{OracleText: "Lightning Bolt deals 3 damage to any target."},
+			want: "Lightning Bolt deals 3 damage to any target.",
+		},
+		{
+			name: "multi-face cards join their faces in order",
+			card: scryfall.Card{CardFaces: []scryfall.CardFace{
+				{Name: "Front", OracleText: &front},
+				{Name: "Back", OracleText: &back},
+			}},
+			want: "Flying\n//\nDraw a card.",
+		},
+		{
+			name: "faces without text are skipped",
+			card: scryfall.Card{CardFaces: []scryfall.CardFace{
+				{Name: "Front", OracleText: &front},
+				{Name: "Back"},
+			}},
+			want: "Flying",
+		},
+		{
+			name: "vanilla card has no text",
+			card: scryfall.Card{},
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := BuildCardResult(tt.card).OracleText; got != tt.want {
+				t.Errorf("OracleText: expected %q, got %q", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestBuildCardResult_LocalizedText(t *testing.T) {
+	name, text := "Ninja der späten Stunden", "Ninjutsu {1}{U}"
+	frontName, backName := "Amethystdrache", "Explosiver Kristall"
+	frontText, backText := "Fliegend, Eile", "Explosiver Kristall fügt 4 Schadenspunkte zu."
+
+	t.Run("single face", func(t *testing.T) {
+		result := BuildCardResult(scryfall.Card{Lang: "de", PrintedName: &name, PrintedText: &text})
+		if result.PrintedName == nil || *result.PrintedName != name {
+			t.Errorf("PrintedName: expected %q, got %v", name, result.PrintedName)
+		}
+		if result.PrintedText != text {
+			t.Errorf("PrintedText: expected %q, got %q", text, result.PrintedText)
+		}
+	})
+
+	t.Run("multi-face cards join their faces", func(t *testing.T) {
+		result := BuildCardResult(scryfall.Card{Lang: "de", CardFaces: []scryfall.CardFace{
+			{PrintedName: &frontName, PrintedText: &frontText},
+			{PrintedName: &backName, PrintedText: &backText},
+		}})
+		wantName := "Amethystdrache // Explosiver Kristall"
+		if result.PrintedName == nil || *result.PrintedName != wantName {
+			t.Errorf("PrintedName: expected %q, got %v", wantName, result.PrintedName)
+		}
+		wantText := frontText + "\n//\n" + backText
+		if result.PrintedText != wantText {
+			t.Errorf("PrintedText: expected %q, got %q", wantText, result.PrintedText)
+		}
+	})
+
+	t.Run("untranslated faces fall back to English instead of being dropped", func(t *testing.T) {
+		backOracle := "Return target creature card from your graveyard to your hand."
+		result := BuildCardResult(scryfall.Card{Lang: "de", CardFaces: []scryfall.CardFace{
+			{Name: "Cheerful Osteomancer", PrintedName: &frontName, PrintedText: &frontText},
+			{Name: "Raise Dead", OracleText: &backOracle},
+		}})
+		wantName := "Amethystdrache // Raise Dead"
+		if result.PrintedName == nil || *result.PrintedName != wantName {
+			t.Errorf("PrintedName: expected %q, got %v", wantName, result.PrintedName)
+		}
+		wantText := frontText + "\n//\n" + backOracle
+		if result.PrintedText != wantText {
+			t.Errorf("PrintedText: expected %q, got %q", wantText, result.PrintedText)
+		}
+	})
+
+	t.Run("English multi-face cards have no localized fields", func(t *testing.T) {
+		oracle := "Flying"
+		result := BuildCardResult(scryfall.Card{Lang: "en", CardFaces: []scryfall.CardFace{
+			{Name: "Front", OracleText: &oracle},
+			{Name: "Back", OracleText: &oracle},
+		}})
+		if result.PrintedName != nil {
+			t.Errorf("PrintedName: expected nil, got %q", *result.PrintedName)
+		}
+		if result.PrintedText != "" {
+			t.Errorf("PrintedText: expected empty, got %q", result.PrintedText)
+		}
+	})
+
+	t.Run("English cards have no localized fields", func(t *testing.T) {
+		result := BuildCardResult(scryfall.Card{Lang: "en", OracleText: "Flying"})
+		if result.PrintedName != nil {
+			t.Errorf("PrintedName: expected nil, got %q", *result.PrintedName)
+		}
+		if result.PrintedText != "" {
+			t.Errorf("PrintedText: expected empty, got %q", result.PrintedText)
+		}
+	})
+}
+
 func TestBuildCardResult_EmptyCard(t *testing.T) {
 	result := BuildCardResult(scryfall.Card{})
 

@@ -3,6 +3,10 @@
 	import { untrack } from 'svelte';
 	import { enhance, deserialize } from '$app/forms';
 	import { resolve } from '$app/paths';
+	// PROTOTYPE: `?variant=` Cards page prototype (dev only), see ./prototype/
+	import { dev } from '$app/environment';
+	import PrototypeSwitcher from '$lib/components/PrototypeSwitcher.svelte';
+	import VariantPush from './prototype/VariantPush.svelte';
 	import type { ActionData, PageData } from './$types';
 	import {
 		CardResultCard,
@@ -27,6 +31,13 @@
 	import SetIcon from '$lib/components/SetIcon.svelte';
 
 	let { form, data }: { form: ActionData; data: PageData } = $props();
+
+	// PROTOTYPE: the switcher toggles between today's page (`null`) and the winning
+	// push-aside variant. Overlay and bottom-sheet were dropped.
+	const protoVariants = [
+		{ key: null, label: 'Current' },
+		{ key: 'push', label: 'Push-aside' }
+	];
 
 	let searching = $state(false);
 	let showSearchBuilder = $state(false);
@@ -176,274 +187,286 @@
 	<title>Search Cards - ShowMyCards</title>
 </svelte:head>
 
-<div class="container mx-auto px-4 py-8 max-w-7xl">
-	<PageHeader
-		title="Search Cards"
-		description="Search Scryfall's database for Magic: The Gathering cards" />
+{#if dev && data.proto}
+	{#key data.proto}
+		<VariantPush proto={data.proto} locations={data.storageLocations} />
+	{/key}
+{:else}
+	<div class="container mx-auto px-4 py-8 max-w-7xl">
+		<PageHeader
+			title="Search Cards"
+			description="Search Scryfall's database for Magic: The Gathering cards" />
 
-	<div class="card bg-base-200 shadow-lg mb-6">
-		<div class="card-body">
-			<form
-				method="POST"
-				action="?/search"
-				use:enhance={() => {
-					searching = true;
-					return async ({ update }) => {
-						await update({ reset: false });
-						searching = false;
-					};
-				}}>
-				<div class="flex flex-wrap gap-2">
-					<input
-						bind:this={inputRef}
-						type="text"
-						name="q"
-						value={form?.query || ''}
-						oninput={(e) => (queryText = e.currentTarget.value)}
-						placeholder="Search for cards..."
-						class="input input-bordered flex-1 min-w-[12rem]"
-						required />
-					<select
-						name="lang"
-						bind:value={selectedLang}
-						disabled={hasTypedLanguage}
-						aria-label="Search language"
-						title="Language filter — appended as l:<code> to the search"
-						class="select select-bordered"
-						class:opacity-50={hasTypedLanguage}>
-						{#each SCRYFALL_LANGUAGES as lang (lang.code)}
-							<option value={lang.code}>{lang.name}</option>
-						{/each}
-					</select>
-					<button type="submit" disabled={searching} class="btn btn-primary">
-						{#if searching}
-							<span class="loading loading-spinner loading-sm"></span>
-							Searching...
-						{:else}
-							<Search class="w-4 h-4" />
-							Search
-						{/if}
-					</button>
-					<button
-						type="button"
-						class="btn btn-outline"
-						title="Advanced"
-						onclick={() => (showSearchBuilder = true)}>
-						<SlidersHorizontal class="w-4 h-4" />
-						Advanced
-					</button>
-				</div>
-				{#if hasTypedLanguage}
-					<p class="text-xs opacity-70 mt-2">
-						Language filter <code class="font-mono">{typedLangClause}</code> in your query overrides the
-						dropdown.
-					</p>
-				{/if}
-			</form>
-		</div>
-	</div>
-
-	{#if form?.success && form.data}
-		<StatsCard
-			stats={[
-				{
-					title: 'Results Found',
-					value: form.data.total_cards || 0,
-					description: form.data.has_more ? 'Showing first page' : 'All results shown'
-				},
-				{
-					title: 'Displaying',
-					value: filteredCards.length,
-					description: filterText ? 'Matching filter' : 'Cards on this page'
-				}
-			]}
-			class="mb-6 w-full" />
-
-		<!-- Filter bar -->
-		<div class="flex flex-col gap-4 mb-4">
-			<div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-				<div class="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-					<CardFilter
-						searchText={filterText}
-						onSearchChange={handleSearchChange}
-						showStatusFilter={false}
-						placeholder="Filter results by name, set, or treatment..." />
-					<div class="join">
-						<button
-							class="btn btn-sm join-item {collectionFilter === 'all'
-								? 'btn-neutral'
-								: 'btn-ghost'}"
-							onclick={() => {
-								collectionFilter = 'all';
-								currentPage = 1;
-							}}>
-							All results
-						</button>
-						<button
-							class="btn btn-sm join-item {collectionFilter === 'collection'
-								? 'btn-neutral'
-								: 'btn-ghost'}"
-							onclick={() => {
-								collectionFilter = 'collection';
-								currentPage = 1;
-							}}>
-							In collection
-						</button>
-						<button
-							class="btn btn-sm join-item {collectionFilter === 'not-in-collection'
-								? 'btn-neutral'
-								: 'btn-ghost'}"
-							onclick={() => {
-								collectionFilter = 'not-in-collection';
-								currentPage = 1;
-							}}>
-							Not in collection
-						</button>
-						<button
-							class="btn btn-sm join-item {collectionFilter === 'available'
-								? 'btn-neutral'
-								: 'btn-ghost'}"
-							title="Owned cards with at least one copy not committed to any deck"
-							onclick={() => {
-								collectionFilter = 'available';
-								currentPage = 1;
-							}}>
-							Available for deck building
-						</button>
-					</div>
-				</div>
-				<ViewToggle viewMode={view.viewMode} onViewModeChange={view.setViewMode} />
-			</div>
-			{#if filterText || totalFilteredPages > 1}
-				<div class="text-sm opacity-70">
-					{#if filterText}
-						Showing {filteredCards.length} of {cards.length} cards
-					{/if}
-					{#if totalFilteredPages > 1}
-						(page {currentPage} of {totalFilteredPages})
-					{/if}
-				</div>
-			{/if}
-		</div>
-
-		{#if cards.length > 0 && filteredCards.length === 0}
-			<EmptyState message="No cards match your filter">
-				<p class="text-sm opacity-70">Try adjusting your search criteria</p>
-			</EmptyState>
-		{:else if paginatedCards.length > 0}
-			{#if view.viewMode === 'grid'}
-				<!-- Grid View -->
-				<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-					{#each paginatedCards as card (card.id)}
-						<CardResultCard
-							{card}
-							deck={card.deck.owned > 0 ? card.deck : undefined}
-							onremove={handleRemove}
-							storageLocations={data.storageLocations} />
-					{/each}
-				</div>
-			{:else}
-				<!-- Table View -->
-				<div class="overflow-x-auto">
-					<table class="table table-zebra">
-						<thead>
-							<tr>
-								<th>Card Name</th>
-								<th>Set</th>
-								<th>#</th>
-								<th>Treatment(s)</th>
-								<th>In Collection</th>
-							</tr>
-						</thead>
-						<tbody>
-							{#each paginatedCards as card (card.id)}
-								{@const primaryTreatment = getPrimaryTreatment(card)}
-								{@const isFoil = isFoilTreatment(primaryTreatment)}
-								{@const totalQty = card.inventory.total_quantity}
-								<tr class="hover:bg-base-300">
-									<td>
-										<a href={resolve(`/cards/${card.id}`)} class="font-semibold hover:text-primary">
-											{getDisplayName(card)}
-										</a>
-									</td>
-									<td>
-										<div class="flex items-center gap-2">
-											<SetIcon
-												setCode={card.set_code}
-												setName={card.set_name}
-												rarity="common"
-												{isFoil} />
-											<span class="text-sm">{card.set_name}</span>
-										</div>
-									</td>
-									<td>#{card.collector_number || '?'}</td>
-									<td>
-										<div class="flex flex-wrap gap-1">
-											{#each card.finishes as finish (finish)}
-												<TreatmentBadge
-													treatment={finish}
-													finishes={card.finishes}
-													frameEffects={card.frame_effects ?? []}
-													promoTypes={card.promo_types ?? []}
-													size="xs" />
-											{/each}
-										</div>
-									</td>
-									<td>
-										{#if totalQty > 0}
-											<span class="badge badge-primary">{totalQty}</span>
-										{:else}
-											<span class="opacity-50">-</span>
-										{/if}
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
-			{/if}
-
-			<!-- Pagination -->
-			{#if totalFilteredPages > 1}
-				<div class="mt-6">
-					<Pagination
-						{currentPage}
-						totalPages={totalFilteredPages}
-						onPageChange={handlePageChange} />
-				</div>
-			{/if}
-		{:else}
-			<EmptyState message="No cards found" />
-
-			{#if suggestions.length > 0}
-				<div class="mt-4 p-4 bg-base-200 rounded-lg">
-					<div class="flex items-center gap-2 text-sm opacity-70 mb-3">
-						<Lightbulb class="w-4 h-4" />
-						<span>Did you mean:</span>
-					</div>
+		<div class="card bg-base-200 shadow-lg mb-6">
+			<div class="card-body">
+				<form
+					method="POST"
+					action="?/search"
+					use:enhance={() => {
+						searching = true;
+						return async ({ update }) => {
+							await update({ reset: false });
+							searching = false;
+						};
+					}}>
 					<div class="flex flex-wrap gap-2">
-						{#each suggestions as suggestion (suggestion)}
+						<input
+							bind:this={inputRef}
+							type="text"
+							name="q"
+							value={form?.query || ''}
+							oninput={(e) => (queryText = e.currentTarget.value)}
+							placeholder="Search for cards..."
+							class="input input-bordered flex-1 min-w-[12rem]"
+							required />
+						<select
+							name="lang"
+							bind:value={selectedLang}
+							disabled={hasTypedLanguage}
+							aria-label="Search language"
+							title="Language filter — appended as l:<code> to the search"
+							class="select select-bordered"
+							class:opacity-50={hasTypedLanguage}>
+							{#each SCRYFALL_LANGUAGES as lang (lang.code)}
+								<option value={lang.code}>{lang.name}</option>
+							{/each}
+						</select>
+						<button type="submit" disabled={searching} class="btn btn-primary">
+							{#if searching}
+								<span class="loading loading-spinner loading-sm"></span>
+								Searching...
+							{:else}
+								<Search class="w-4 h-4" />
+								Search
+							{/if}
+						</button>
+						<button
+							type="button"
+							class="btn btn-outline"
+							title="Advanced"
+							onclick={() => (showSearchBuilder = true)}>
+							<SlidersHorizontal class="w-4 h-4" />
+							Advanced
+						</button>
+					</div>
+					{#if hasTypedLanguage}
+						<p class="text-xs opacity-70 mt-2">
+							Language filter <code class="font-mono">{typedLangClause}</code> in your query overrides
+							the dropdown.
+						</p>
+					{/if}
+				</form>
+			</div>
+		</div>
+
+		{#if form?.success && form.data}
+			<StatsCard
+				stats={[
+					{
+						title: 'Results Found',
+						value: form.data.total_cards || 0,
+						description: form.data.has_more ? 'Showing first page' : 'All results shown'
+					},
+					{
+						title: 'Displaying',
+						value: filteredCards.length,
+						description: filterText ? 'Matching filter' : 'Cards on this page'
+					}
+				]}
+				class="mb-6 w-full" />
+
+			<!-- Filter bar -->
+			<div class="flex flex-col gap-4 mb-4">
+				<div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+					<div class="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+						<CardFilter
+							searchText={filterText}
+							onSearchChange={handleSearchChange}
+							showStatusFilter={false}
+							placeholder="Filter results by name, set, or treatment..." />
+						<div class="join">
 							<button
-								type="button"
-								class="btn btn-sm btn-outline"
-								onclick={() => searchSuggestion(suggestion)}>
-								{suggestion}
+								class="btn btn-sm join-item {collectionFilter === 'all'
+									? 'btn-neutral'
+									: 'btn-ghost'}"
+								onclick={() => {
+									collectionFilter = 'all';
+									currentPage = 1;
+								}}>
+								All results
 							</button>
+							<button
+								class="btn btn-sm join-item {collectionFilter === 'collection'
+									? 'btn-neutral'
+									: 'btn-ghost'}"
+								onclick={() => {
+									collectionFilter = 'collection';
+									currentPage = 1;
+								}}>
+								In collection
+							</button>
+							<button
+								class="btn btn-sm join-item {collectionFilter === 'not-in-collection'
+									? 'btn-neutral'
+									: 'btn-ghost'}"
+								onclick={() => {
+									collectionFilter = 'not-in-collection';
+									currentPage = 1;
+								}}>
+								Not in collection
+							</button>
+							<button
+								class="btn btn-sm join-item {collectionFilter === 'available'
+									? 'btn-neutral'
+									: 'btn-ghost'}"
+								title="Owned cards with at least one copy not committed to any deck"
+								onclick={() => {
+									collectionFilter = 'available';
+									currentPage = 1;
+								}}>
+								Available for deck building
+							</button>
+						</div>
+					</div>
+					<ViewToggle viewMode={view.viewMode} onViewModeChange={view.setViewMode} />
+				</div>
+				{#if filterText || totalFilteredPages > 1}
+					<div class="text-sm opacity-70">
+						{#if filterText}
+							Showing {filteredCards.length} of {cards.length} cards
+						{/if}
+						{#if totalFilteredPages > 1}
+							(page {currentPage} of {totalFilteredPages})
+						{/if}
+					</div>
+				{/if}
+			</div>
+
+			{#if cards.length > 0 && filteredCards.length === 0}
+				<EmptyState message="No cards match your filter">
+					<p class="text-sm opacity-70">Try adjusting your search criteria</p>
+				</EmptyState>
+			{:else if paginatedCards.length > 0}
+				{#if view.viewMode === 'grid'}
+					<!-- Grid View -->
+					<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+						{#each paginatedCards as card (card.id)}
+							<CardResultCard
+								{card}
+								deck={card.deck.owned > 0 ? card.deck : undefined}
+								onremove={handleRemove}
+								storageLocations={data.storageLocations} />
 						{/each}
 					</div>
-				</div>
+				{:else}
+					<!-- Table View -->
+					<div class="overflow-x-auto">
+						<table class="table table-zebra">
+							<thead>
+								<tr>
+									<th>Card Name</th>
+									<th>Set</th>
+									<th>#</th>
+									<th>Treatment(s)</th>
+									<th>In Collection</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each paginatedCards as card (card.id)}
+									{@const primaryTreatment = getPrimaryTreatment(card)}
+									{@const isFoil = isFoilTreatment(primaryTreatment)}
+									{@const totalQty = card.inventory.total_quantity}
+									<tr class="hover:bg-base-300">
+										<td>
+											<a
+												href={resolve(`/cards/${card.id}`)}
+												class="font-semibold hover:text-primary">
+												{getDisplayName(card)}
+											</a>
+										</td>
+										<td>
+											<div class="flex items-center gap-2">
+												<SetIcon
+													setCode={card.set_code}
+													setName={card.set_name}
+													rarity="common"
+													{isFoil} />
+												<span class="text-sm">{card.set_name}</span>
+											</div>
+										</td>
+										<td>#{card.collector_number || '?'}</td>
+										<td>
+											<div class="flex flex-wrap gap-1">
+												{#each card.finishes as finish (finish)}
+													<TreatmentBadge
+														treatment={finish}
+														finishes={card.finishes}
+														frameEffects={card.frame_effects ?? []}
+														promoTypes={card.promo_types ?? []}
+														size="xs" />
+												{/each}
+											</div>
+										</td>
+										<td>
+											{#if totalQty > 0}
+												<span class="badge badge-primary">{totalQty}</span>
+											{:else}
+												<span class="opacity-50">-</span>
+											{/if}
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+
+				<!-- Pagination -->
+				{#if totalFilteredPages > 1}
+					<div class="mt-6">
+						<Pagination
+							{currentPage}
+							totalPages={totalFilteredPages}
+							onPageChange={handlePageChange} />
+					</div>
+				{/if}
+			{:else}
+				<EmptyState message="No cards found" />
+
+				{#if suggestions.length > 0}
+					<div class="mt-4 p-4 bg-base-200 rounded-lg">
+						<div class="flex items-center gap-2 text-sm opacity-70 mb-3">
+							<Lightbulb class="w-4 h-4" />
+							<span>Did you mean:</span>
+						</div>
+						<div class="flex flex-wrap gap-2">
+							{#each suggestions as suggestion (suggestion)}
+								<button
+									type="button"
+									class="btn btn-sm btn-outline"
+									onclick={() => searchSuggestion(suggestion)}>
+									{suggestion}
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
 			{/if}
 		{/if}
-	{/if}
-</div>
+	</div>
 
-<SearchBuilderModal
-	open={showSearchBuilder}
-	onClose={() => (showSearchBuilder = false)}
-	onSearch={(q) => {
-		if (inputRef) {
-			inputRef.value = q;
-			queryText = q;
-			inputRef.form?.requestSubmit();
-		}
-	}} />
+	<SearchBuilderModal
+		open={showSearchBuilder}
+		onClose={() => (showSearchBuilder = false)}
+		onSearch={(q) => {
+			if (inputRef) {
+				inputRef.value = q;
+				queryText = q;
+				inputRef.form?.requestSubmit();
+			}
+		}} />
+{/if}
+
+{#if dev}
+	<PrototypeSwitcher variants={protoVariants} note="Prototype · changes aren't saved" />
+{/if}

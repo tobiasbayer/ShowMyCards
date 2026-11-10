@@ -703,6 +703,17 @@ export interface CardResult {
 	oracle_id: string;
 	name: string;
 	printed_name?: string;
+	/**
+	 * OracleText is the English Oracle text. Multi-face cards join their faces'
+	 * text with a "\n//\n" line, in face order.
+	 */
+	oracle_text?: string;
+	/**
+	 * PrintedText is the text as printed on a non-English card, in its
+	 * language, joined across faces like OracleText. Empty for English cards
+	 * and when Scryfall has no localized text.
+	 */
+	printed_text?: string;
 	set_code?: string;
 	set_name?: string;
 	collector_number?: string;
