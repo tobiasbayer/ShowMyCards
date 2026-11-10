@@ -489,6 +489,17 @@ The user reported that "Move to" in the detail panel did nothing. It took three 
 
 **User preference recorded:** no OS-native dropdown menus in this UI. Use the DaisyUI `dropdown` (or an in-app list like the Add popover's destination picker).
 
+### Follow-up: one copy, two decks (2026-11-10)
+
+The user found that a card owned once and wanted by two decks (Salvation Swan in the test data: one copy, in "Byrke Commander" and "Foo") made **both** deck pages say "You own everything this deck needs", and that adding it to the second deck gave no warning.
+
+- **Cause:** the backend already flagged the conflict per item (`over_committed`), but the deck-level `aggregate_shortfall` is measured per deck, so each deck covers the card alone. The deck page banner and the decks-list badge read only that number, and the add dialog never looked at availability.
+- **Decision:** surface the conflict, never resolve it. No deck wins the copy, and adding is never blocked.
+- **Deck level (separate MR):** `aggregate_over_committed` on `DeckSummary` and `DeckItemsResponse` counts the distinct cards a deck covers alone but other decks want too. It is disjoint from `aggregate_shortfall` and ignores the maybe board. The deck page banner and a "Shared N" badge on the decks list use it. It lives on branch `feat/fr98-deck-shared-cards`, based on `feat/fr98-deck-ui` for an upstream MR. This branch carries the same two commits as cherry-picks, which drop out when it is rebased after that MR lands.
+- **Add time (prototype only):** in single-card mode the dialog shows a quiet notice, "You own 1 copy and 1 is already in Byrke Commander. Adding it here means they can't all be built at once.", and the success toast becomes a warning naming the other decks. It stays quiet when nothing is owned, when enough copies are free, when only the target deck holds the card, and for the maybe zone. Bulk mode has no notice.
+- **Known gap:** the notice is built from `/decks/for-card/:scryfall_id`, which lists any-printing items and items pinned to *that* printing. A deck that pinned a different printing of the same card is not listed, so the notice misses that case. The deck page banner still shows it.
+- **Not done:** naming the other decks per row on the deck page (the banner gives only a count); a notice in bulk mode; the deck-page search results (`DeckAddResultCard`), whose signal is the banner updating after the add.
+
 ## Local search engine (2026-11-10)
 
 The user asked to implement the local Scryfall syntax and to wire it into the prototype only (not today's inventory pages). The engine is its own package so it can move to `main` as "Suggested order" step 2.
@@ -599,6 +610,7 @@ Other Scryfall errors in All cards show "Scryfall couldn't read this search" (or
 - **Face rule:** the rule between faces in the panel text is faint in the dark theme.
 - **Collection queries on today's inventory pages:** the endpoint could replace `fetchAllInventoryCards` and the name/set filter box there (proposal step 2). Not wired yet, by the user's choice.
 - **The scope dropdown in the header is still a native `<select>`,** so it opens the OS menu the user disliked for Move. Switch it to the DaisyUI dropdown too?
+- **The Add-to-deck dialog's deck picker is also a native `<select>`** (`AddToDeckModal.svelte`), with the same objection.
 - **Duplicate location names:** locations can share a name (for example a binder and a box both called "A1"), and the Move menu, the scope dropdown and the Add popover can't tell them apart. The older `StorageLocationDropdown` prefixes 📖 (binder) or 📦 (box). Show the storage type, or require unique names?
 
 ## Tooling notes for this environment
