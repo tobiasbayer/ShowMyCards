@@ -7,7 +7,7 @@
 	import { getDisplayName, type EnhancedCardResult } from '$lib';
 	import { Layers, Plus } from '@lucide/svelte';
 	import AddPopover from './AddPopover.svelte';
-	import { ownedCount, ownsOtherPrinting, type CardsView } from './state.svelte';
+	import { locationName, ownedCount, ownsOtherPrinting, type CardsView } from './state.svelte';
 
 	let { card, view }: { card: EnhancedCardResult; view: CardsView } = $props();
 
@@ -15,6 +15,15 @@
 
 	// In a location-filtered Collection, count only the copies at that location.
 	const count = $derived(ownedCount(card, view.source === 'collection' ? view.location : 'all'));
+	// The number is copies of this printing in the scope the page is showing, so
+	// the wording follows the scope (it is only "in this storage" for a location).
+	const ownedTip = $derived.by(() => {
+		const copies = `${count} ${count === 1 ? 'copy' : 'copies'}`;
+		if (view.source !== 'collection' || view.location === 'all')
+			return `${copies} in your collection`;
+		if (view.location === 'unassigned') return `${copies} not in any storage`;
+		return `${copies} in ${locationName(view.locations, view.location)}`;
+	});
 	const otherPrintingOnly = $derived(
 		count === 0 && view.source === 'catalog' && ownsOtherPrinting(card)
 	);
@@ -73,24 +82,30 @@
 		{/if}
 		<span class="ml-auto flex shrink-0 items-center gap-1 pl-1">
 			{#if deck.owned > 0}
-				<span
-					class="badge badge-sm gap-0.5 rounded-full px-1.5 font-semibold tabular-nums
-						{deck.free > 0 ? 'badge-soft badge-success' : 'badge-ghost text-base-content/40'}"
-					title={deck.free > 0
-						? `${deck.free} free for decks (all printings)`
-						: 'All copies are in decks'}>
-					<Layers class="size-3" aria-hidden="true" />{deck.free}
+				<span class="tooltip tooltip-top flex" data-tip="Free for deck building">
+					<span
+						class="badge badge-sm gap-0.5 rounded-full px-1.5 font-semibold tabular-nums
+							{deck.free > 0 ? 'badge-soft badge-success' : 'badge-ghost text-base-content/40'}"
+						role="img"
+						aria-label="Free for deck building: {deck.free}">
+						<Layers class="size-3" aria-hidden="true" />{deck.free}
+					</span>
 				</span>
 			{/if}
 			{#if count > 0}
-				<span
-					class="badge badge-primary badge-sm rounded-full px-1.5 font-semibold tabular-nums"
-					title="{count} owned">{count}</span>
+				<span class="tooltip tooltip-left flex" data-tip={ownedTip}>
+					<span
+						class="badge badge-primary badge-sm rounded-full px-1.5 font-semibold tabular-nums"
+						role="img"
+						aria-label={ownedTip}>{count}</span>
+				</span>
 			{:else if otherPrintingOnly}
-				<span
-					class="block size-2.5 rounded-full border-[1.5px] border-base-content/35"
-					title="You own another printing of this card"
-					aria-label="You own another printing of this card"></span>
+				<span class="tooltip tooltip-left flex" data-tip="You own another printing of this card">
+					<span
+						class="block size-2.5 rounded-full border-[1.5px] border-base-content/35"
+						role="img"
+						aria-label="You own another printing of this card"></span>
+				</span>
 			{/if}
 		</span>
 	</div>
