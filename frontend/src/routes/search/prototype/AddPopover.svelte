@@ -1,7 +1,7 @@
 <!--
-	PROTOTYPE. Compact Add popover: one button per finish (each click saves one
-	copy), one destination line showing the resolved location, and a running
-	tally with undo.
+	PROTOTYPE. Compact Add popover: one destination line showing the resolved
+	location, one button per finish below it (each click saves one copy), and a
+	running tally with undo.
 -->
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
@@ -168,7 +168,19 @@
 			</li>
 		</ul>
 	{:else}
-		<div class="flex flex-wrap gap-1">
+		<button
+			type="button"
+			class="flex w-full items-center gap-1.5 rounded-field px-1.5 py-1 text-left text-xs hover:bg-base-200"
+			onclick={() => (picking = true)}>
+			<MapPin class="size-3.5 shrink-0 opacity-50" />
+			<span class="max-w-[75%] shrink-0 truncate font-medium">
+				{current === undefined ? 'Resolving…' : locationName(view.locations, current)}
+			</span>
+			{#if qualifier}<span class="min-w-0 truncate text-base-content/40">· {qualifier}</span>{/if}
+			<ChevronDown class="ml-auto size-3.5 shrink-0 opacity-50" />
+		</button>
+
+		<div class="mt-1.5 flex flex-wrap gap-1">
 			{#each finishes as f (f.key)}
 				<button
 					type="button"
@@ -185,18 +197,6 @@
 				</button>
 			{/each}
 		</div>
-
-		<button
-			type="button"
-			class="mt-1.5 flex w-full items-center gap-1.5 rounded-field px-1.5 py-1 text-left text-xs hover:bg-base-200"
-			onclick={() => (picking = true)}>
-			<MapPin class="size-3.5 shrink-0 opacity-50" />
-			<span class="max-w-[75%] shrink-0 truncate font-medium">
-				{current === undefined ? 'Resolving…' : locationName(view.locations, current)}
-			</span>
-			{#if qualifier}<span class="min-w-0 truncate text-base-content/40">· {qualifier}</span>{/if}
-			<ChevronDown class="ml-auto size-3.5 shrink-0 opacity-50" />
-		</button>
 
 		{#if tally}
 			<div class="mt-1 flex items-center gap-2 px-1.5 text-xs text-base-content/60">
