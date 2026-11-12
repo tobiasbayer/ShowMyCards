@@ -77,8 +77,11 @@
 	const single = $derived(!bulk && cards.length === 1 ? cards[0] : null);
 	const previewNames = $derived(cards.slice(0, 3).map((c) => c.name));
 	const selectedDeck = $derived(decks.find((d) => String(d.id) === deckId));
+	// While "New" is open, the deck being named is the target, never the deck
+	// selected before it, which stays in `deckId` for Cancel.
+	const hasTarget = $derived(creatingDeck ? !!newDeckName.trim() && !savingDeck : !!selectedDeck);
 	const canSubmit = $derived(
-		!!selectedDeck && cards.length > 0 && !saving && (bulk || (Number.isInteger(qty) && qty >= 1))
+		hasTarget && cards.length > 0 && !saving && (bulk || (Number.isInteger(qty) && qty >= 1))
 	);
 
 	// Advisory only: how many copies of the card are free and which decks already
@@ -107,10 +110,12 @@
 		};
 	});
 
+	// A deck still being named has no items, so every deck wanting the card is another deck.
+	const targetDeckId = $derived(creatingDeck ? null : selectedDeck?.id);
 	const sharedCopies = $derived(
-		copyInfo && selectedDeck && Number.isInteger(qty) && qty >= 1
+		copyInfo && targetDeckId !== undefined && Number.isInteger(qty) && qty >= 1
 			? sharedCopyNotice(copyInfo.availability, copyInfo.usage, {
-					deckId: selectedDeck.id,
+					deckId: targetDeckId,
 					zone,
 					quantity: qty
 				})
@@ -138,31 +143,32 @@
 		if (open) untrack(loadDecks);
 	});
 
-	async function createDeck() {
+	/** Creates the deck being named and selects it. Resolves to it, or undefined when that failed. */
+	async function createDeck(): Promise<DeckSummary | undefined> {
 		const name = newDeckName.trim();
-		if (!name || savingDeck) return;
+		if (!name || savingDeck) return undefined;
 		savingDeck = true;
 		try {
 			const created = await decksApi.create({ name, description: '' });
-			decks = [
-				{
-					id: created.id,
-					name: created.name,
-					description: created.description ?? '',
-					created_at: '',
-					updated_at: '',
-					total_items: 0,
-					total_cards_demand: 0,
-					aggregate_shortfall: 0,
-					aggregate_over_committed: 0
-				},
-				...decks
-			];
+			const summary: DeckSummary = {
+				id: created.id,
+				name: created.name,
+				description: created.description ?? '',
+				created_at: '',
+				updated_at: '',
+				total_items: 0,
+				total_cards_demand: 0,
+				aggregate_shortfall: 0,
+				aggregate_over_committed: 0
+			};
+			decks = [summary, ...decks];
 			deckId = String(created.id);
 			creatingDeck = false;
 			newDeckName = '';
+			return summary;
 		} catch (e) {
 			notifications.error(e instanceof Error ? e.message : 'Failed to create deck');
+			return undefined;
 		} finally {
 			savingDeck = false;
 		}
@@ -180,9 +186,8 @@
 
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
-		if (!canSubmit || !selectedDeck) return;
+		if (!canSubmit) return;
 
-		const deck = selectedDeck;
 		const items = buildDeckItems(cards, {
 			zone,
 			pin,
@@ -195,6 +200,10 @@
 
 		saving = true;
 		try {
+			// A name typed under "New" is the deck meant: create it first.
+			const deck = creatingDeck ? await createDeck() : selectedDeck;
+			if (!deck) return;
+
 			const response = await fetch(`/decks/${deck.id}/items`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },

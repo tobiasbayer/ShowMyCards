@@ -112,6 +112,16 @@ describe('sharedCopyNotice', () => {
 		).toBeNull();
 	});
 
+	it('counts every deck as another deck for a deck not created yet', () => {
+		expect(
+			sharedCopyNotice(availability(1, 0), oneCopyInByrke, {
+				deckId: null,
+				zone: 'main',
+				quantity: 1
+			})
+		).toEqual({ owned: 1, wantedElsewhere: 1, deckNames: ['Byrke Commander'] });
+	});
+
 	it('stays quiet when only the target deck holds the card', () => {
 		expect(
 			sharedCopyNotice(availability(1, 0), oneCopyInByrke, { deckId: 2, zone: 'main', quantity: 1 })

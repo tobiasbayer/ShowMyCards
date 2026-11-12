@@ -32,8 +32,12 @@ interface CopyInfo {
  * the card's availability and deck usage to canned responses.
  */
 function mockBackend(decks: DeckSummary[], copyInfo?: CopyInfo) {
-	fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+	fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 		const url = String(input);
+		if (url.endsWith('/api/decks') && init?.method === 'POST') {
+			const { name } = JSON.parse(String(init.body));
+			return new Response(JSON.stringify({ id: 42, name, description: '' }), { status: 201 });
+		}
 		if (url.endsWith('/api/decks')) {
 			return new Response(JSON.stringify(decks), { status: 200 });
 		}
@@ -123,6 +127,33 @@ describe('AddToDeckModal', () => {
 			['sol', 2],
 			['bolt', 2]
 		]);
+	});
+
+	it('creates the deck being named and adds to it, not to the deck selected before', async () => {
+		localStorage.setItem('smc-last-deck-id', '9');
+		mockBackend([deck(7, 'Mono Red'), deck(9, 'Elves')]);
+		const onAdded = vi.fn();
+		render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose: vi.fn() });
+
+		await expect.element(page.getByLabelText('Deck', { exact: true })).toHaveValue('9');
+		await page.getByRole('button', { name: 'New' }).click();
+		await page.getByPlaceholder('New deck name').fill('Burn');
+		await page.getByRole('button', { name: 'Add to deck' }).click();
+
+		await vi.waitFor(() => expect(onAdded).toHaveBeenCalledWith('Burn'));
+		expect(requested('/decks/9/items')).toBe(false);
+		expect(postedItems()?.url).toBe('/decks/42/items');
+	});
+
+	it("can't add while the new deck has no name", async () => {
+		localStorage.setItem('smc-last-deck-id', '9');
+		mockBackend([deck(7, 'Mono Red'), deck(9, 'Elves')]);
+		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+
+		await expect.element(page.getByLabelText('Deck', { exact: true })).toHaveValue('9');
+		await page.getByRole('button', { name: 'New' }).click();
+
+		await expect.element(page.getByRole('button', { name: 'Add to deck' })).toBeDisabled();
 	});
 
 	it('preselects the last deck used', async () => {

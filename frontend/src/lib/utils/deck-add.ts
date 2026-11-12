@@ -70,7 +70,8 @@ export interface SharedCopyNotice {
 }
 
 export interface SharedCopyTarget {
-	deckId: number;
+	/** null: a deck not created yet, so every deck wanting the card is another deck. */
+	deckId: number | null;
 	zone: DeckZone;
 	quantity: number;
 }

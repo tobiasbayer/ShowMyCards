@@ -550,6 +550,8 @@ The user asked for the inventory browser's multi-select on the Cards page: check
 - No console errors.
 - **Checks:** svelte-check reports 0 errors, eslint and prettier are clean, and all 344 frontend tests pass. These include new `stacks.test.ts` cases and an `AddToDeckModal` case for several cards outside bulk mode.
 
+**Fixed after the user tried it:** in `AddToDeckModal`, "+ New" plus a typed name, then "Add to deck", added the cards to the previously selected deck and created no deck. That deck stayed in `deckId` behind the name field. Now the deck being named is the target: "Add to deck" creates it first and stays disabled until a name is typed. The shared-copy notice treats it as a deck with no items (`deckId: null`). The bug predated multi-select and affected every caller.
+
 **Open:**
 - The Move menu inherits the duplicate-location-names problem (two "A1" entries).
 - Shift-click ranges follow the loaded tiles only, and "Select all" in All cards selects only the loaded pages.
