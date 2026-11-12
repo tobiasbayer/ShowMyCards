@@ -130,7 +130,7 @@
 		<!-- Action Buttons -->
 		<div class="flex gap-2 ml-auto">
 			<a
-				href={resolve(`/inventory/${location.id}`)}
+				href={resolve(`/search?location=${location.id}` as '/search')}
 				class="btn bg-base-100 btn-sm"
 				title="Browse cards in this location">
 				<Grid2x2 class="w-4 h-4" />

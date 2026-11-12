@@ -31,7 +31,7 @@
 		title="Inventory Browser"
 		description="Browse all your cards or explore a storage location">
 		{#snippet actions()}
-			<a href={resolve('/inventory/all')} class="btn btn-primary btn-sm">
+			<a href={resolve('/search')} class="btn btn-primary btn-sm">
 				<Grid2x2 class="w-4 h-4" />
 				All Cards
 			</a>
@@ -77,7 +77,9 @@
 
 							<!-- Browse Button -->
 							<div class="ml-auto">
-								<a href={resolve('/inventory/unassigned')} class="btn btn-primary btn-sm">
+								<a
+									href={resolve('/search?location=unassigned' as '/search')}
+									class="btn btn-primary btn-sm">
 									<Grid2x2 class="w-4 h-4" />
 									Browse
 								</a>
@@ -109,7 +111,9 @@
 
 							<!-- Browse Button -->
 							<div class="ml-auto">
-								<a href={resolve(`/inventory/${location.id}`)} class="btn btn-primary btn-sm">
+								<a
+									href={resolve(`/search?location=${location.id}` as '/search')}
+									class="btn btn-primary btn-sm">
 									<Grid2x2 class="w-4 h-4" />
 									Browse
 								</a>

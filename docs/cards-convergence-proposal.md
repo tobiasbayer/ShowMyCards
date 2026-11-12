@@ -556,6 +556,21 @@ The user asked for the inventory browser's multi-select on the Cards page: check
 - The Move menu inherits the duplicate-location-names problem (two "A1" entries).
 - Shift-click ranges follow the loaded tiles only, and "Select all" in All cards selects only the loaded pages.
 
+### Follow-up: Browse opens the Cards page (2026-11-12)
+
+The user asked for the inventory browser's "Browse" buttons to open the Cards page with the location preselected, and for the old card view to be removed.
+
+- **Links:** `/search` already reads `?location=<id|unassigned>`, so only the links changed.
+  - On `/inventory`, a location's "Browse" goes to `/search?location=<id>`, Unassigned's to `/search?location=unassigned`, and "All Cards" to `/search` (My collection).
+  - On `/storage`, the grid icon goes to `/search?location=<id>`.
+  - The `/inventory` index stays as the landing view (§3).
+- **Removed:**
+  - The routes `/inventory/[id]`, `/inventory/unassigned` and `/inventory/all`. The user chose to drop `/inventory/all` too.
+  - `InventoryBrowser.svelte` and its spec.
+  - The parts only it used: `BulkActionsBar`, `SplitMoveModal`, `CardInventoryLocations`, the `showLocations` and `onSplitMove` props of `CardResultCard`, and `getInventoryUnitPrice` and `sortInventoryCardsByPrice` in `card-prices.ts` (with their tests).
+- **Kept:** `/inventory/recent`, which has no Cards-page equivalent yet (it needs sort by newest), and the `selection` store, which `CardResultCard` and `card-collection` still use.
+- **Gaps on the Cards page that `/inventory/all` covered:** sort by price, and a per-card list of locations with copy counts. The detail panel's "Your copies" section partly covers the second.
+
 ## Local search engine (2026-11-10)
 
 The user asked to implement the local Scryfall syntax and to wire it into the prototype only (not today's inventory pages). The engine is its own package so it can move to `main` as "Suggested order" step 2.

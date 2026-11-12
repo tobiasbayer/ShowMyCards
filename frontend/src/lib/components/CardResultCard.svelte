@@ -11,13 +11,12 @@
 		selection,
 		audio
 	} from '$lib';
-	import { FolderInput, LayersPlus } from '@lucide/svelte';
+	import { LayersPlus } from '@lucide/svelte';
 	import AddToDeckModal from './AddToDeckModal.svelte';
 	import PriceLozenge from './PriceLozenge.svelte';
 	import StorageLocationDropdown from './StorageLocationDropdown.svelte';
 	import PrintingConflictModal from './PrintingConflictModal.svelte';
 	import TreatmentBadge from './TreatmentBadge.svelte';
-	import CardInventoryLocations from './CardInventoryLocations.svelte';
 	import { deserialize } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -30,8 +29,6 @@
 		storageLocations = [],
 		selectable = false,
 		readOnly = false,
-		showLocations = false,
-		onSplitMove,
 		deck
 	}: {
 		card: EnhancedCardResult;
@@ -39,8 +36,6 @@
 		storageLocations?: StorageLocation[];
 		selectable?: boolean;
 		readOnly?: boolean;
-		showLocations?: boolean;
-		onSplitMove?: (inv: Inventory, available: number) => void;
 		/** Optional deck-availability summary; renders a "free for decks" indicator when set. */
 		deck?: { owned: number; decked: number; free: number };
 	} = $props();
@@ -349,15 +344,6 @@
 			selection.selectMany(inventoryIds);
 		}
 	}
-
-	// Open the split-move dialog for a treatment's inventory stack. The stack may span
-	// multiple rows (the add flow never merges), so pass the aggregated quantity.
-	function handleSplitMove(treatment: string) {
-		const inv = inventory.find((i) => i.treatment === treatment);
-		if (!inv) return;
-		const available = thisPrintingByTreatment.get(treatment) ?? inv.quantity;
-		onSplitMove?.(inv, available);
-	}
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -447,10 +433,6 @@
 			</div>
 		{/if}
 
-		{#if showLocations}
-			<CardInventoryLocations inventory={displayedInventory} />
-		{/if}
-
 		<div class="flex">
 			<!-- For each treatment: -->
 			{#each availableTreatments as treatment, index (treatment)}
@@ -491,16 +473,6 @@
 								class="btn btn-sm btn-square bg-base-100">
 								+
 							</button>
-							{#if onSplitMove && quantity > 0}
-								<button
-									onclick={() => handleSplitMove(treatment)}
-									disabled={adding || removing}
-									class="btn btn-sm btn-square bg-base-100"
-									title="Move copies to another location"
-									aria-label="Move copies to another location">
-									<FolderInput class="h-4 w-4" />
-								</button>
-							{/if}
 						</div>
 					{/if}
 				</div>
