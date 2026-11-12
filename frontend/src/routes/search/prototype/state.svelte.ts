@@ -6,8 +6,10 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
+import { SvelteSet } from 'svelte/reactivity';
 import {
 	apiClient,
+	inventoryApi,
 	notifications,
 	type DeckAvailability,
 	type EnhancedCardResult,
@@ -15,12 +17,20 @@ import {
 	type SearchResponse,
 	type StorageLocation
 } from '$lib';
-import { aggregateStacks, pickRowToDecrement, rowsOfStack, type Stack } from './stacks';
+import {
+	aggregateStacks,
+	idsBetween,
+	inLocation,
+	pickRowToDecrement,
+	rowsInLocation,
+	rowsOfStack,
+	type LocationFilter,
+	type Stack
+} from './stacks';
 
-export type { Stack } from './stacks';
+export type { LocationFilter, Stack } from './stacks';
 
 export type Source = 'collection' | 'catalog';
-export type LocationFilter = 'all' | 'unassigned' | number;
 /**
  * The scope dropdown: `catalog` is "All cards" (Scryfall); a LocationFilter is
  * the collection (`all` = every location, `unassigned`, or one location id).
@@ -189,10 +199,136 @@ export function refreshCard(card: EnhancedCardResult) {
 	return enqueue(card, async () => {});
 }
 
-export function matchesLocation(stack: Stack, filter: LocationFilter): boolean {
-	if (filter === 'all') return true;
-	if (filter === 'unassigned') return stack.locationId === null;
-	return stack.locationId === filter;
+/** Ids per batch request: the backend's MaxBatchIDs (backend/api/constants.go). */
+const BATCH_SIZE = 1000;
+/** Cards re-read at once after a bulk write. */
+const REFRESH_CONCURRENCY = 6;
+
+function chunks<T>(items: T[]): T[][] {
+	const out: T[][] = [];
+	for (let i = 0; i < items.length; i += BATCH_SIZE) out.push(items.slice(i, i + BATCH_SIZE));
+	return out;
+}
+
+const copies = (n: number) => `${n} ${n === 1 ? 'copy' : 'copies'}`;
+const sumQuantity = (rows: Inventory[]) => rows.reduce((sum, r) => sum + r.quantity, 0);
+
+/** The card's rows holding copies in the scope: what a bulk action touches. */
+export function scopeRows(card: EnhancedCardResult, filter: LocationFilter): Inventory[] {
+	return rowsInLocation(currentRows(card), filter);
+}
+
+/** Re-reads cards a few at a time; a card that fails keeps what it showed. */
+async function refreshAll(cards: EnhancedCardResult[]) {
+	let next = 0;
+	const worker = async () => {
+		while (next < cards.length) await refresh(cards[next++]).catch(() => {});
+	};
+	await Promise.all(Array.from({ length: Math.min(REFRESH_CONCURRENCY, cards.length) }, worker));
+}
+
+/**
+ * Runs one write over several cards once their queued single-card writes are
+ * done, and makes later single-card writes wait for it. Afterwards it re-reads
+ * every card, after a failure too, so what is shown matches the database.
+ */
+function bulk<T>(cards: EnhancedCardResult[], write: () => Promise<T>): Promise<T | undefined> {
+	const run = Promise.all(cards.map((c) => queues.get(c.id))).then(async () => {
+		for (const c of cards) live.busy[c.id] = true;
+		try {
+			return await write();
+		} catch (e) {
+			notifications.error(`Couldn't save: ${e instanceof Error ? e.message : 'unknown error'}`);
+			return undefined;
+		} finally {
+			await refreshAll(cards);
+			for (const c of cards) live.busy[c.id] = false;
+		}
+	});
+	for (const c of cards) queues.set(c.id, run);
+	return run;
+}
+
+/**
+ * Moves the cards' copies in the scope to a location (null = unassigned).
+ * Resolves to true once copies moved.
+ */
+export function moveCopies(
+	cards: EnhancedCardResult[],
+	filter: LocationFilter,
+	to: number | null,
+	locations: StorageLocation[]
+) {
+	return bulk(cards, async () => {
+		const rows = cards
+			.flatMap((c) => scopeRows(c, filter))
+			.filter((r) => (r.storage_location_id ?? null) !== to);
+		const where = locationName(locations, to);
+		if (rows.length === 0) {
+			notifications.info(`Already in ${where}`);
+			return false;
+		}
+		for (const ids of chunks(rows.map((r) => r.id))) {
+			await inventoryApi.batchMove(ids, to ?? undefined);
+		}
+		notifications.success(`Moved ${copies(sumQuantity(rows))} to ${where}`);
+		return true;
+	});
+}
+
+/** Deletes the cards' copies in the scope. Resolves to true once copies are deleted. */
+export function deleteCopies(cards: EnhancedCardResult[], filter: LocationFilter) {
+	return bulk(cards, async () => {
+		const rows = cards.flatMap((c) => scopeRows(c, filter));
+		if (rows.length === 0) return false;
+		for (const ids of chunks(rows.map((r) => r.id))) await inventoryApi.batchDelete(ids);
+		notifications.success(`Deleted ${copies(sumQuantity(rows))}`);
+		return true;
+	});
+}
+
+/**
+ * Lets the sorting rules place the cards' copies in the scope again.
+ * Resolves to true once the rules ran.
+ */
+export async function resortCopies(
+	cards: EnhancedCardResult[],
+	filter: LocationFilter
+): Promise<boolean> {
+	let before: Inventory[] = [];
+	const errors = await bulk(cards, async () => {
+		before = cards.flatMap((c) => scopeRows(c, filter));
+		// Never send an empty list: the backend re-sorts the whole collection then.
+		if (before.length === 0) return undefined;
+		let failed = 0;
+		for (const ids of chunks(before.map((r) => r.id))) {
+			failed += (await inventoryApi.resort(ids)).errors;
+		}
+		return failed;
+	});
+	if (errors === undefined) return false;
+
+	// Re-sort keeps row ids, so the rows re-read by bulk() show which copies moved.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local lookup, not state
+	const now = new Map(cards.flatMap((c) => currentRows(c)).map((r) => [r.id, r]));
+	const moved = sumQuantity(
+		before.filter(
+			(r) => (now.get(r.id)?.storage_location_id ?? null) !== (r.storage_location_id ?? null)
+		)
+	);
+	const result = moved === 0 ? 'Already sorted' : `Sorting rules moved ${copies(moved)}`;
+	if (errors > 0) notifications.warning(`${result}; ${errors} couldn't be sorted`);
+	else notifications.success(result);
+	return true;
+}
+
+/** After adding cards to a deck, re-read them (the deck badges). */
+export function refreshCards(cards: EnhancedCardResult[]) {
+	return bulk(cards, async () => {});
+}
+
+export function matchesLocation(stack: Pick<Stack, 'locationId'>, filter: LocationFilter): boolean {
+	return inLocation(stack.locationId, filter);
 }
 
 export function ownedCount(card: EnhancedCardResult, filter: LocationFilter = 'all'): number {
@@ -353,6 +489,47 @@ export class CardsView {
 			? this.visibleCount < this.filteredCollection.length
 			: this.hasMore && !this.loadingMore
 	);
+
+	/** Every match: all of the collection's, or the loaded All cards pages. */
+	results = $derived(this.source === 'collection' ? this.filteredCollection : this.catalog);
+
+	/**
+	 * Ids of the tiles checked for a bulk action. The view is rebuilt on every
+	 * server load, so a new search or scope starts with nothing checked.
+	 */
+	checked = new SvelteSet<string>();
+	/** The last tile toggled; Shift-click checks the range from it. */
+	#anchor: string | null = null;
+
+	checkedCards = $derived(this.results.filter((card) => this.checked.has(card.id)));
+	/** While anything is checked, a click on a tile toggles it instead of opening the panel. */
+	selecting = $derived(this.checkedCards.length > 0);
+
+	toggleCheck(card: EnhancedCardResult, range = false) {
+		const on = !this.checked.has(card.id);
+		const ids =
+			range && this.#anchor
+				? idsBetween(
+						this.cards.map((c) => c.id),
+						this.#anchor,
+						card.id
+					)
+				: [card.id];
+		for (const id of ids) {
+			if (on) this.checked.add(id);
+			else this.checked.delete(id);
+		}
+		this.#anchor = card.id;
+	}
+
+	checkAll() {
+		for (const card of this.results) this.checked.add(card.id);
+	}
+
+	clearChecks() {
+		this.checked.clear();
+		this.#anchor = null;
+	}
 
 	async loadMore() {
 		if (!this.canLoadMore) return;

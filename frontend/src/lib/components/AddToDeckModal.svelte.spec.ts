@@ -98,6 +98,33 @@ describe('AddToDeckModal', () => {
 		});
 	});
 
+	it('adds a quantity of each of several cards outside bulk mode', async () => {
+		mockBackend([deck(7, 'Mono Red')]);
+		const onAdded = vi.fn();
+		render(AddToDeckModal, {
+			open: true,
+			cards: [sol, { oracle_id: 'bolt', scryfall_id: 'm10-1', name: 'Lightning Bolt', copies: 1 }],
+			onAdded,
+			onClose: vi.fn()
+		});
+
+		// Nothing is counted in copies: the cards need not be owned.
+		await expect.element(page.getByText('2 cards selected')).toBeInTheDocument();
+		await page.getByLabelText('Quantity of each').fill('2');
+		await page.getByRole('button', { name: 'Add to deck' }).click();
+
+		await vi.waitFor(() => expect(onAdded).toHaveBeenCalledWith('Mono Red'));
+		expect(
+			postedItems()?.body.items.map((i: { oracle_id: string; desired_quantity: number }) => [
+				i.oracle_id,
+				i.desired_quantity
+			])
+		).toEqual([
+			['sol', 2],
+			['bolt', 2]
+		]);
+	});
+
 	it('preselects the last deck used', async () => {
 		localStorage.setItem('smc-last-deck-id', '9');
 		mockBackend([deck(7, 'Mono Red'), deck(9, 'Elves')]);

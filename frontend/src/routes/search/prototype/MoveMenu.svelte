@@ -2,6 +2,7 @@
 	PROTOTYPE. "Move stack" menu: the move icon opens a DaisyUI dropdown listing
 	the other locations, the same <details class="dropdown"> pattern as
 	DeckCardActions. Picking one moves the stack; Esc or a click outside cancels.
+	The selection bar reuses it with a text label, opening upwards.
 -->
 <script lang="ts">
 	import type { StorageLocation } from '$lib';
@@ -13,14 +14,20 @@
 		locations,
 		current,
 		label,
+		text,
+		top = false,
 		disabled = false,
 		onMove
 	}: {
 		locations: StorageLocation[];
-		/** Where the stack is now (null = unassigned); left out of the list. */
-		current: number | null;
-		/** Accessible name of the icon button. */
+		/** Where the copies are now (null = unassigned); left out of the list. Undefined lists all. */
+		current?: number | null;
+		/** Accessible name of the button. */
 		label: string;
+		/** Visible text next to the icon; without it the button is icon-only. */
+		text?: string;
+		/** Open upwards, for a button at the bottom of the screen. */
+		top?: boolean;
 		disabled?: boolean;
 		onMove: (to: number | null) => void;
 	} = $props();
@@ -52,15 +59,23 @@
 
 <svelte:window onkeydown={onKeydown} onpointerdown={onPointerDown} />
 
-<details class="dropdown dropdown-end" bind:open bind:this={root}>
+<details
+	class="dropdown {top ? 'dropdown-top dropdown-center' : 'dropdown-end'}"
+	bind:open
+	bind:this={root}>
 	<summary
-		class="btn btn-square btn-ghost btn-xs ml-1 {disabled ? 'btn-disabled' : ''}"
+		class="btn btn-ghost {text ? 'btn-sm rounded-full' : 'btn-square btn-xs ml-1'} {disabled
+			? 'btn-disabled'
+			: ''}"
 		title="Move"
 		aria-label={label}>
-		<ArrowRightLeft class="size-3.5" />
+		<ArrowRightLeft class={text ? 'size-4' : 'size-3.5'} />
+		{#if text}<span class="hidden sm:inline">{text}</span>{/if}
 	</summary>
 	<ul
-		class="dropdown-content menu menu-sm z-20 mt-1 max-h-72 w-60 flex-nowrap overflow-y-auto rounded-box border border-base-300 bg-base-100 p-1 shadow-lg">
+		class="dropdown-content menu menu-sm z-20 {top
+			? 'mb-1'
+			: 'mt-1'} max-h-72 w-60 flex-nowrap overflow-y-auto rounded-box border border-base-300 bg-base-100 p-1 shadow-lg">
 		<li class="menu-title">Move to</li>
 		{#each locations as loc (loc.id)}
 			{#if loc.id !== current}

@@ -241,8 +241,13 @@
 			<div class="rounded-box bg-base-200 p-3">
 				<div class="font-semibold">
 					{cards.length}
-					{cards.length === 1 ? 'card' : 'cards'} · {totalCopies}
-					{totalCopies === 1 ? 'copy' : 'copies'} selected
+					{cards.length === 1 ? 'card' : 'cards'}
+					<!-- Owned copies matter only in bulk mode, where they can set the quantity. -->
+					{#if bulk}
+						· {totalCopies}
+						{totalCopies === 1 ? 'copy' : 'copies'}
+					{/if}
+					selected
 				</div>
 				<div class="truncate text-sm opacity-70">
 					{previewNames.join(', ')}{cards.length > 3 ? ` +${cards.length - 3} more` : ''}
@@ -351,7 +356,8 @@
 			</fieldset>
 		{:else}
 			<div class="flex flex-col gap-2">
-				<label for="{uid}-qty" class="font-semibold">Quantity</label>
+				<label for="{uid}-qty" class="font-semibold"
+					>{single ? 'Quantity' : 'Quantity of each'}</label>
 				<input id="{uid}-qty" type="number" min="1" class="input input-sm w-24" bind:value={qty} />
 			</div>
 		{/if}

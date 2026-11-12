@@ -1,11 +1,13 @@
 <!--
 	PROTOTYPE, throwaway. Minimal card tile: image, "Name · SET", a deck badge
-	(copies free for decks) and an ownership badge, and a single hover "+" that
-	opens the Add popover.
+	(copies free for decks) and an ownership badge, a hover "+" that opens the
+	Add popover, and a hover checkmark that selects the tile for bulk actions.
+	While anything is selected, a click toggles the tile instead of opening the
+	panel, Shift-click selects a range, and "+" is hidden.
 -->
 <script lang="ts">
 	import { getDisplayName, type EnhancedCardResult } from '$lib';
-	import { Layers, Plus } from '@lucide/svelte';
+	import { Check, Layers, Plus } from '@lucide/svelte';
 	import AddPopover from './AddPopover.svelte';
 	import { locationName, ownedCount, ownsOtherPrinting, type CardsView } from './state.svelte';
 
@@ -28,22 +30,25 @@
 		count === 0 && view.source === 'catalog' && ownsOtherPrinting(card)
 	);
 	const isSelected = $derived(view.selected?.id === card.id);
+	const checked = $derived(view.checked.has(card.id));
+	// While selecting, the ring marks checked tiles rather than the panel's card.
+	const ringed = $derived(view.selecting ? checked : isSelected);
 	const name = $derived(getDisplayName(card));
 	// Per card, not per printing: decks ask for a card, any printing fills the slot.
 	const deck = $derived(view.forDecks(card));
 </script>
 
-<div class="group">
+<div class="group {view.selecting ? 'select-none' : ''}">
 	<div class="relative">
 		<button
 			type="button"
 			class="block w-full overflow-hidden rounded-[4.75%/3.4%] bg-base-300 shadow-sm outline-offset-4 transition duration-150
-				{isSelected
+				{ringed
 				? 'ring-2 ring-primary ring-offset-2 ring-offset-base-100'
 				: 'group-hover:-translate-y-0.5 group-hover:shadow-lg'}"
-			aria-label="Show details for {name}"
-			aria-pressed={isSelected}
-			onclick={() => view.select(card)}>
+			aria-label={view.selecting ? `Select ${name}` : `Show details for ${name}`}
+			aria-pressed={ringed}
+			onclick={(e) => (view.selecting ? view.toggleCheck(card, e.shiftKey) : view.select(card))}>
 			{#if card.image_uri}
 				<img
 					src={card.image_uri}
@@ -57,7 +62,25 @@
 			{/if}
 		</button>
 
-		{#if !adding}
+		<button
+			type="button"
+			role="checkbox"
+			aria-checked={checked}
+			class="btn btn-circle btn-sm absolute top-2 left-2 shadow-md backdrop-blur transition-opacity
+				{checked ? 'btn-primary' : 'border-0 bg-base-100/90 text-base-content/40 hover:text-base-content'}
+				{view.selecting ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100'}"
+			aria-label="Select {name}"
+			title={checked ? 'Deselect' : 'Select'}
+			onclick={(e) => view.toggleCheck(card, e.shiftKey)}>
+			<Check class="size-4" strokeWidth={3} />
+		</button>
+
+		{#if adding}
+			<div class="absolute inset-x-1.5 bottom-1.5 z-20">
+				<AddPopover {card} {view} onClose={() => (adding = false)} />
+			</div>
+		{:else if !view.selecting}
+			<!-- Hidden while selecting, so a stray click can't add a copy. -->
 			<button
 				type="button"
 				class="btn btn-circle btn-sm absolute right-2 bottom-2 border-0 bg-base-100/90 shadow-md backdrop-blur
@@ -67,10 +90,6 @@
 				onclick={() => (adding = true)}>
 				<Plus class="size-4" />
 			</button>
-		{:else}
-			<div class="absolute inset-x-1.5 bottom-1.5 z-20">
-				<AddPopover {card} {view} onClose={() => (adding = false)} />
-			</div>
 		{/if}
 	</div>
 

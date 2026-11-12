@@ -9,14 +9,19 @@
 	import CardGrid from './CardGrid.svelte';
 	import CardPanel from './CardPanel.svelte';
 	import CardsHeader from './CardsHeader.svelte';
+	import SelectionBar from './SelectionBar.svelte';
 	import { CardsView, ui, type ProtoData } from './state.svelte';
 
 	let { proto, locations }: { proto: ProtoData; locations: StorageLocation[] } = $props();
 
 	const view = untrack(() => new CardsView(proto, locations));
 
+	// Esc closes an open popover, menu or dialog first (they count themselves in
+	// ui.openPopovers), then clears the selection, then closes the panel.
 	function onKeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape' && view.selected && ui.openPopovers === 0) view.close();
+		if (event.key !== 'Escape' || ui.openPopovers > 0) return;
+		if (view.selecting) view.clearChecks();
+		else if (view.selected) view.close();
 	}
 </script>
 
@@ -38,3 +43,5 @@
 		{/if}
 	</div>
 </div>
+
+<SelectionBar {view} />

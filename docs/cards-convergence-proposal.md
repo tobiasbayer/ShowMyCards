@@ -278,7 +278,8 @@ This section records what the user decided while trying the prototype of the uni
 |---|---|
 | `frontend/src/routes/search/prototype/state.svelte.ts` | `CardsView` (source, query, scope, selection, catalog paging, result counts, `forDecks()`), the `live` store of data re-read after writes, the write actions (`addCopy`, `removeCopy`, `undoAdd`, `moveStack`, `refreshCard`), and helpers such as `effectiveStacks`, `ownedCount`, `existingLocation` and `resolveAuto` |
 | `.../prototype/stacks.ts` (+ `stacks.test.ts`) | Pure helpers: `aggregateStacks`, `rowsOfStack`, `pickRowToDecrement` |
-| `.../prototype/MoveMenu.svelte` | The Move icon's DaisyUI dropdown of target locations |
+| `.../prototype/MoveMenu.svelte` | The Move icon's DaisyUI dropdown of target locations; the selection bar reuses it with a label, opening upwards |
+| `.../prototype/SelectionBar.svelte` | The floating bar for checked tiles: Select all, Move to, Add to deck, Re-sort, Delete (with its confirmation dialog), Clear |
 | `.../prototype/CardsHeader.svelte` | Search input (applied on Enter), scope dropdown (All cards / My collection / locations / Unassigned), result counter |
 | `.../prototype/CardGrid.svelte` | Infinite-scroll grid |
 | `.../prototype/CardTile.svelte` | Tile: image, caption, deck badge, owned badge, hover "+" |
@@ -499,6 +500,59 @@ The user found that a card owned once and wanted by two decks (Salvation Swan in
 - **Add time (prototype only):** in single-card mode the dialog shows a quiet notice, "You own 1 copy and 1 is already in Byrke Commander. Adding it here means they can't all be built at once.", and the success toast becomes a warning naming the other decks. It stays quiet when nothing is owned, when enough copies are free, when only the target deck holds the card, and for the maybe zone. Bulk mode has no notice.
 - **Known gap:** the notice is built from `/decks/for-card/:scryfall_id`, which lists any-printing items and items pinned to *that* printing. A deck that pinned a different printing of the same card is not listed, so the notice misses that case. The deck page banner still shows it.
 - **Not done:** naming the other decks per row on the deck page (the banner gives only a count); a notice in bulk mode; the deck-page search results (`DeckAddResultCard`), whose signal is the banner updating after the add.
+
+### Follow-up: multi-select (2026-11-12)
+
+The user asked for the inventory browser's multi-select on the Cards page: check several cards, then add them to a deck or move them.
+
+**Decisions the user made:**
+- **Selecting:** hovering a tile shows a round checkmark in its top-left corner, beside the existing "+" in the bottom-right one. While anything is checked:
+  - every tile shows its checkmark;
+  - a click on a tile toggles it instead of opening the panel;
+  - Shift-click checks a range;
+  - "+" is hidden, so a stray click can't add a copy.
+  
+  The user preferred this to a "Select" button in the header.
+- **Scopes:** selection works in every scope, All cards included.
+- **Actions:** Move to, Add to deck, Re-sort and Delete, like the inventory browser. Delete asks in an in-app dialog, not `confirm()`.
+
+**Semantics:**
+- **What is selected:** card IDs (printings, one per tile), held in `CardsView.checked`.
+  - The view is rebuilt on every server load, so a new search or scope starts with nothing checked.
+  - The selection also clears after each successful action. It stays after a failed one, so the action can be retried.
+- **What an action touches:** the checked cards' rows **in the current scope**, the copies the owned badge counts (`scopeRows`, built on `rowsInLocation` in `stacks.ts`). A location scope touches only that location; My collection and All cards touch every owned copy of the printing.
+- **Move to:**
+  - It uses `batchMove`, like the inventory browser, so stacks are **not merged** at the destination. The display sums split rows, and the stack-uniqueness migration (§3) will merge them.
+  - It skips rows already at the destination. In a one-location scope, that location is left out of the menu.
+- **Add to deck:**
+  - Collection scopes open `AddToDeckModal` in bulk mode, with the copies in scope behind "All selected (N)".
+  - All cards opens it in non-bulk mode, with one "Quantity of each" for every card, owned or not. `AddToDeckModal` drops "· N copies" from its summary there.
+- **Re-sort:**
+  - It never sends an empty `ids` list, because the backend then re-sorts the **whole collection**.
+  - Its toast counts copies moved: re-sort keeps row IDs, so the rows re-read afterwards show which copies moved.
+- **Delete:** the dialog names the copies and the scope, for example "Delete 2 copies of Appa, Loyal Sky Bison from A10? This can't be undone."
+- **Without owned copies** in the selection (possible only in All cards): Move to, Re-sort and Delete are disabled.
+- **Request size:** row IDs go in chunks of 1000, the backend's `MaxBatchIDs`.
+- **Updating the page after a write:** there is no page reload, because rebuilding the view would reset the loaded results and the scroll position. Instead, `bulk()` in `state.svelte.ts` re-reads the affected cards' rows and deck availability with the existing `refresh()`, 6 cards at a time, after a failure too.
+- **Ordering:** `bulk()` waits for single-card writes already queued on those cards, and later single-card writes wait for it.
+- **Esc order:** an open menu or dialog, then the selection, then the panel. The bar's dialogs count themselves in `ui.openPopovers`.
+
+**Verified** in Chrome against a copy of a real database, with real clicks:
+- **Selecting:** the hover checkmark appears beside "+". Shift-click checked tiles 1–4, and the panel stayed closed.
+- **Move to:** moving 8 copies from A1 to A10 updated the grid, the counter (11 → 3) and the storage overview (A1 3, A10 9).
+- **Esc order:** the Move menu, then the selection, then the panel. Esc in the deck and delete dialogs kept the selection.
+- **Add to deck:**
+  - In a location, Select all gave "5 cards · 9 copies", and "1 of each" lowered the deck badges without a reload.
+  - In All cards, an unowned and an owned card were each added once.
+- **Re-sort:** "Sorting rules moved 5 copies"; the tiles left A10.
+- **Delete:** the dialog, Esc, then Delete removed the tile.
+- **Failure:** with the backend stopped, a move showed one toast and kept the data and the selection.
+- No console errors.
+- **Checks:** svelte-check reports 0 errors, eslint and prettier are clean, and all 344 frontend tests pass. These include new `stacks.test.ts` cases and an `AddToDeckModal` case for several cards outside bulk mode.
+
+**Open:**
+- The Move menu inherits the duplicate-location-names problem (two "A1" entries).
+- Shift-click ranges follow the loaded tiles only, and "Select all" in All cards selects only the loaded pages.
 
 ## Local search engine (2026-11-10)
 
