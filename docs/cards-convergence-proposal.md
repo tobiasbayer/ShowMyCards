@@ -307,7 +307,9 @@ These override the proposal where they differ.
 - **Clean, minimal UI is a standing preference.** Show only what is needed, and put details behind the panel. Hide empty sections rather than rendering empty states. Minimal does not mean small: cards must stay readable.
 
 ### Page chrome
-- The page has only a search input, a scope dropdown, a language dropdown and a result counter. This replaced the original `Collection | Catalog` switch and the location select; see "Merged scope and local search" below. It has no stats row, grid/table toggle, owned/not-owned post-filter, "Advanced" builder or per-tile storage dropdown. The language dropdown came back on 2026-11-13; see "Follow-up: language dropdown".
+- The page has only a search input, a scope dropdown, a language dropdown and a result counter. This replaced the original `Collection | Catalog` switch and the location select; see "Merged scope and local search" below. It has no stats row, grid/table toggle, owned/not-owned post-filter or per-tile storage dropdown.
+  - The language dropdown came back on 2026-11-13; see "Follow-up: language dropdown".
+  - The advanced search builder came back the same day, as a popover behind an icon in the search field; see "Follow-up: advanced search builder".
 - **Result counter.** It sits at the right end of the header row and shows quiet text such as "120 cards".
   - **Collection:** the number of physical copies matching the name and location filter. This is the same unit as `card_count` on the storage overview (`GET /api/storage/with-counts`, `SUM(quantity)`). Its tooltip says "N copies in M printings". Verified: a location's count equals its storage-overview count, and the sum over all locations plus unassigned equals the total.
   - **Catalog:** Scryfall's `total_cards` for the query, not just the loaded pages.
@@ -609,6 +611,38 @@ The user wanted the old search page's language dropdown on the Cards page, defau
   - Collection: `+page.server.ts` adds `l:<code>` to the query sent to `/api/inventory/search` unless the query has a clause or the pick is Any.
   - All cards: `lang=<code>` goes to `/api/search` only when picked, so without a pick the backend still applies the setting. Any sends `lang=any` (Scryfall `l:any`). "Load more" sends the same `lang`.
 - **Shared helper:** `frontend/src/lib/utils/language-clause.ts` (`hasLanguageClause`, `typedLanguageClause`, `withLanguage`), also used by the card list parser. The backend's `languageClauseRegExp` now matches `language:` too, the local engine's alias.
+
+### Follow-up: advanced search builder (2026-11-13)
+
+The user asked for the old search page's "Advanced" builder (`SearchBuilderModal`) on the Cards page. Every keyword it emits (`name:`, `s:`, `t:`, `c:`/`c=`, `(c:x or c:y)`, `cmc`, `pow`, `tou`, `loy`) is supported by the local engine, so it works in every scope without backend changes.
+
+**Settled:**
+- **Placement:** a popover under the search field, opened by a sliders icon at the right end of the search pill. The user picked this over a modal. The icon sits outside the `<label>`, positioned over the pill, because a label may hold only the control it names.
+- **The built query replaces** the typed text and runs like Enter: in the current scope, with the language pick.
+- **Fields stay filled until Clear.** Their state is module-level (`<script module>` in `SearchBuilder.svelte`), because every search rebuilds `VariantPush`/`CardsHeader` (`{#key data.proto}`). A full page reload empties them.
+- **Collection fields (user request):** collection scopes add a "Your copies" group with Finish (Nonfoil/Foil/Etched; clicking the active one clears it), Quantity and Free for decks. It emits `finish:`, `qty` and `free`, which count copies in scope like the badges. All cards hides the group, and `buildSearchQuery` leaves those terms out unless it gets `{ collection: true }`, so values set earlier never reach Scryfall.
+- **No native selects:**
+  - colours are Mana-font toggle buttons (`ms ms-w ms-cost`, instead of scryfall.io SVGs);
+  - colour match (All/Any/Exactly, shown once a colour is picked) and the `= > <` operators are DaisyUI `join` button groups;
+  - the set picker is the existing `SetCombobox`, sized down with `[&_.input]:input-sm`-style variants.
+- **Closing:** Esc closes the popover first (it counts itself in `ui.openPopovers`), and an outside click or the icon closes it too. As with the other menus, the outside click still reaches what it hit.
+
+**Files:**
+- `frontend/src/lib/utils/search-builder.ts` (+ tests): the `finish` field, the `qty`/`free` numeric keywords, and the `collection` option. The old page's modal is unchanged and builds the same queries.
+- `frontend/src/routes/search/prototype/SearchBuilder.svelte` (new) and `CardsHeader.svelte`.
+
+**Verified** in Chrome against the dev database (the builder only reads), with real clicks:
+- `t:dragon c:r` in My collection;
+- `finish:foil qty>1` submitted with Enter;
+- in All cards, the group was hidden and `t:dragon` was sent without the earlier `finish`/`qty` values;
+- a set picked inside the popover (its list isn't clipped);
+- `lang=en` kept after a builder search;
+- the Esc order (popover, then the panel), outside click and the icon toggle;
+- light and dark themes;
+- the old page's modal still works;
+- no console errors.
+
+**Checks:** svelte-check reports 0 errors; eslint and prettier are clean; 319 server tests pass. The client (browser) tests weren't run, since no component spec covers these files.
 
 ## Local search engine (2026-11-10)
 

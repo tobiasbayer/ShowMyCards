@@ -1,14 +1,16 @@
 <!--
 	PROTOTYPE, throwaway. Page chrome for the Cards prototype: one search field
-	(applied on Enter), one scope dropdown (All cards, My collection, a location,
-	Unassigned), a language dropdown and a result count.
+	(applied on Enter) with the advanced search builder behind its sliders icon,
+	one scope dropdown (All cards, My collection, a location, Unassigned), a
+	language dropdown and a result count.
 -->
 <script lang="ts">
 	import { navigating } from '$app/state';
 	import { untrack } from 'svelte';
-	import { Search } from '@lucide/svelte';
+	import { Search, SlidersHorizontal } from '@lucide/svelte';
 	import { typedLanguageClause } from '$lib/utils/language-clause';
 	import LanguageMenu from './LanguageMenu.svelte';
+	import SearchBuilder from './SearchBuilder.svelte';
 	import type { CardsView, Scope } from './state.svelte';
 
 	let { view }: { view: CardsView } = $props();
@@ -21,6 +23,17 @@
 	function onSubmit(event: SubmitEvent) {
 		event.preventDefault();
 		view.query = draft;
+		view.navigate(view.source);
+	}
+
+	let building = $state(false);
+	let searchRoot = $state<HTMLElement>();
+
+	/** The builder's query replaces the typed one and runs like Enter. */
+	function runBuilt(query: string) {
+		building = false;
+		draft = query;
+		view.query = query;
 		view.navigate(view.source);
 	}
 
@@ -48,20 +61,37 @@
 </script>
 
 <div class="mb-6 flex flex-wrap items-center gap-3">
-	<form class="min-w-64 max-w-2xl flex-1" onsubmit={onSubmit}>
-		<label class="input w-full rounded-full border-base-300 bg-base-100">
-			<Search class="size-4 opacity-40" />
-			<input
-				type="search"
-				bind:value={draft}
-				placeholder={inCollection ? 'Search your cards (Scryfall syntax)' : 'Search all cards'}
-				aria-label={inCollection ? 'Search your cards' : 'Search all cards'}
-				autocomplete="off" />
-			{#if navigating.to}
-				<span class="loading loading-spinner loading-xs opacity-50"></span>
-			{/if}
-		</label>
-	</form>
+	<div class="relative min-w-64 max-w-2xl flex-1" bind:this={searchRoot}>
+		<form class="relative" onsubmit={onSubmit}>
+			<label class="input w-full rounded-full border-base-300 bg-base-100 pr-10">
+				<Search class="size-4 opacity-40" />
+				<input
+					type="search"
+					bind:value={draft}
+					placeholder={inCollection ? 'Search your cards (Scryfall syntax)' : 'Search all cards'}
+					aria-label={inCollection ? 'Search your cards' : 'Search all cards'}
+					autocomplete="off" />
+				{#if navigating.to}
+					<span class="loading loading-spinner loading-xs opacity-50"></span>
+				{/if}
+			</label>
+			<!-- Outside the label: a label may hold only the control it names. -->
+			<button
+				type="button"
+				class="btn btn-circle btn-ghost btn-xs absolute top-1/2 right-2.5 -translate-y-1/2 {building
+					? 'text-primary'
+					: 'opacity-50 hover:opacity-100'}"
+				title="Advanced search"
+				aria-label="Advanced search"
+				aria-expanded={building}
+				onclick={() => (building = !building)}>
+				<SlidersHorizontal class="size-4" />
+			</button>
+		</form>
+		{#if building}
+			<SearchBuilder {view} root={searchRoot} onRun={runBuilt} onClose={() => (building = false)} />
+		{/if}
+	</div>
 
 	<label class="select select-sm w-auto max-w-72 border-base-300">
 		<span class="label">In</span>

@@ -1,5 +1,6 @@
 export type CompareOp = '=' | '>' | '<';
 export type ColorMode = 'all' | 'any' | 'exactly';
+export type Finish = '' | 'nonfoil' | 'foil' | 'etched';
 
 export interface SearchBuilderParams {
 	cardName: string;
@@ -9,6 +10,16 @@ export interface SearchBuilderParams {
 	colorMode: ColorMode;
 	numericValues: Record<string, string>;
 	numericOps: Record<string, CompareOp>;
+	/** Collection only: the finish of the owned copies. */
+	finish?: Finish;
+}
+
+export interface SearchBuilderOptions {
+	/**
+	 * Emit the collection-only terms (`finish:`, `qty`, `free`). Scryfall rejects
+	 * them, so only the local collection search may receive them.
+	 */
+	collection?: boolean;
 }
 
 const NUMERIC_KEYWORDS: Record<string, string> = {
@@ -18,9 +29,27 @@ const NUMERIC_KEYWORDS: Record<string, string> = {
 	tou: 'tou'
 };
 
+/** Collection-only numeric fields: copies in scope, and copies free for decks. */
+const COLLECTION_NUMERIC_KEYWORDS: Record<string, string> = {
+	qty: 'qty',
+	free: 'free'
+};
+
 const COLOR_ORDER = ['w', 'u', 'b', 'r', 'g', 'c'];
 
-export function buildSearchQuery(p: SearchBuilderParams): string {
+function numericTerms(p: SearchBuilderParams, keywords: Record<string, string>): string[] {
+	const parts: string[] = [];
+	for (const [id, keyword] of Object.entries(keywords)) {
+		const val = (p.numericValues[id] ?? '').trim();
+		if (val !== '') parts.push(`${keyword}${p.numericOps[id] ?? '='}${val}`);
+	}
+	return parts;
+}
+
+export function buildSearchQuery(
+	p: SearchBuilderParams,
+	{ collection = false }: SearchBuilderOptions = {}
+): string {
 	const parts: string[] = [];
 
 	if (p.cardName.trim()) {
@@ -52,9 +81,11 @@ export function buildSearchQuery(p: SearchBuilderParams): string {
 		}
 	}
 
-	for (const [id, keyword] of Object.entries(NUMERIC_KEYWORDS)) {
-		const val = (p.numericValues[id] ?? '').trim();
-		if (val !== '') parts.push(`${keyword}${p.numericOps[id] ?? '='}${val}`);
+	parts.push(...numericTerms(p, NUMERIC_KEYWORDS));
+
+	if (collection) {
+		if (p.finish) parts.push(`finish:${p.finish}`);
+		parts.push(...numericTerms(p, COLLECTION_NUMERIC_KEYWORDS));
 	}
 
 	return parts.join(' ');

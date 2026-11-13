@@ -186,6 +186,57 @@ describe('buildSearchQuery', () => {
 		});
 	});
 
+	describe('collection fields', () => {
+		const collection = { collection: true };
+
+		it('finish becomes a finish: term', () => {
+			expect(buildSearchQuery(params({ finish: 'foil' }), collection)).toBe('finish:foil');
+		});
+
+		it('quantity and free use their operators', () => {
+			expect(
+				buildSearchQuery(
+					params({
+						numericValues: { mv: '', pow: '', loy: '', tou: '', qty: '1', free: '0' },
+						numericOps: { mv: '=', pow: '=', loy: '=', tou: '=', qty: '>', free: '>' }
+					}),
+					collection
+				)
+			).toBe('qty>1 free>0');
+		});
+
+		it('are dropped without the collection option', () => {
+			expect(
+				buildSearchQuery(
+					params({
+						cardType: 'Dragon',
+						finish: 'etched',
+						numericValues: { mv: '', pow: '', loy: '', tou: '', qty: '2', free: '1' }
+					})
+				)
+			).toBe('t:Dragon');
+		});
+
+		it('come after the card terms', () => {
+			expect(
+				buildSearchQuery(
+					params({
+						cardType: 'Dragon',
+						colors: new Set(['r']),
+						finish: 'foil',
+						numericValues: { mv: '5', pow: '', loy: '', tou: '', qty: '1', free: '' },
+						numericOps: { mv: '<', pow: '=', loy: '=', tou: '=', qty: '>', free: '=' }
+					}),
+					collection
+				)
+			).toBe('t:Dragon c:r cmc<5 finish:foil qty>1');
+		});
+
+		it('missing collection fields add nothing', () => {
+			expect(buildSearchQuery(params({ cardName: 'Opt' }), collection)).toBe('name:Opt');
+		});
+	});
+
 	describe('edge cases', () => {
 		it('all fields empty returns empty string', () => {
 			expect(buildSearchQuery(params())).toBe('');
