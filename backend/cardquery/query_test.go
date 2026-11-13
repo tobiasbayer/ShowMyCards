@@ -20,7 +20,8 @@ var fixtureNames = []string{
 
 // loadFixtures returns one printing per fixture, keyed by fixture name, with
 // collection facts: one nonfoil copy each, except four Lightning Bolts (M11,
-// foil and nonfoil) and two foil Krenkos with two copies free for decks.
+// foil and nonfoil), a foil copy of the foil-only Secret Lair Bolt, and two
+// foil Krenkos with two copies free for decks.
 func loadFixtures(t *testing.T) map[string]*Printing {
 	t.Helper()
 	base := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -43,6 +44,7 @@ func loadFixtures(t *testing.T) map[string]*Printing {
 	}
 	out["bolt_m11"].Quantity = 4
 	out["bolt_m11"].Finishes = []string{"nonfoil", "foil"}
+	out["bolt_sld_foil"].Finishes = []string{"foil"}
 	out["krenko"].Quantity = 2
 	out["krenko"].Finishes = []string{"foil"}
 	out["krenko"].Free = 2
@@ -190,10 +192,14 @@ func TestMatch(t *testing.T) {
 		{"restricted:vintage", "lotus probe sol_ring"},
 		{"f:pauper", bolts + " delver fire_ice"},
 
-		// Prices: foil-only printings use the foil price; missing prices never match
+		// Prices: the highest price among the owned finishes; missing prices never match
 		{"usd>20", "emrakul jace wasteland"},
 		{"usd<1", "angry_mob delver fire_ice knuckleblade reckoner"},
 		{"usd>=4.5 usd<5", "bolt_sld_foil"},
+		// The M11 Bolt is owned in foil too (6.89, nonfoil 1.03)
+		{"usd>5", "bolt_m11 emrakul jace tarmogoyf valakut wasteland"},
+		// The foil Krenko counts as foil (3.37, nonfoil 1.66)
+		{"eur>3 eur<4", "krenko probe"},
 		{"eur>10000", "lotus"},
 		{"tix>100", "lotus"},
 
@@ -219,8 +225,8 @@ func TestMatch(t *testing.T) {
 
 		// Collection keywords
 		{"qty>=2", "bolt_m11 krenko"},
-		{"finish:foil", "bolt_m11 krenko"},
-		{"finish:nonfoil", except("krenko")},
+		{"finish:foil", "bolt_m11 bolt_sld_foil krenko"},
+		{"finish:nonfoil", except("bolt_sld_foil", "krenko")},
 		{"free>0", "krenko"},
 
 		// Grammar: implicit AND, or, groups, negation
@@ -231,6 +237,7 @@ func TestMatch(t *testing.T) {
 		{"c:r OR c:g mv=2", bolts + " fire_ice knuckleblade krenko reckoner tarmogoyf valakut"},
 		{"", except()},
 		{"order:name", except()},
+		{"order:usd direction:desc", except()},
 	}
 
 	for _, tt := range tests {
@@ -328,6 +335,9 @@ func TestSort(t *testing.T) {
 		// Prices ascending, missing prices last
 		{"order:usd", []string{"lotus", "jace", "angry_mob"}, []string{"angry_mob", "jace", "lotus"}},
 		{"order:usd dir:desc", []string{"lotus", "angry_mob", "jace"}, []string{"jace", "angry_mob", "lotus"}},
+		// Owned finishes count: the M11 Bolt (foil 6.89) and the foil Krenko (3.53)
+		{"order:usd dir:desc", []string{"krenko", "lotus", "tarmogoyf", "bolt_m11"}, []string{"bolt_m11", "tarmogoyf", "krenko", "lotus"}},
+		{"order:usd", []string{"lotus", "bolt_m11", "krenko", "tarmogoyf"}, []string{"krenko", "tarmogoyf", "bolt_m11", "lotus"}},
 		// Released: newest first by default
 		{"order:released", []string{"lotus", "valakut", "angry_mob"}, []string{"valakut", "angry_mob", "lotus"}},
 		{"order:cmc", []string{"emrakul", "lotus", "krenko"}, []string{"lotus", "krenko", "emrakul"}},
@@ -381,10 +391,51 @@ func TestFold(t *testing.T) {
 
 func TestPricesFrom(t *testing.T) {
 	p := PricesFrom("", "4.61", "", "", "7.68", "1.12")
-	if p.USD == nil || *p.USD != 4.61 || p.EUR == nil || *p.EUR != 7.68 || p.Tix == nil || *p.Tix != 1.12 {
-		t.Errorf("PricesFrom fell back wrongly: %+v", p)
+	if v := p.byKey("usd"); v == nil || *v != 4.61 {
+		t.Errorf("byKey(usd) = %v, want the foil price 4.61", v)
 	}
-	if p := PricesFrom("", "", "", "", "", ""); p.USD != nil || p.EUR != nil || p.Tix != nil {
+	if v := p.byKey("eur"); v == nil || *v != 7.68 {
+		t.Errorf("byKey(eur) = %v, want the foil price 7.68", v)
+	}
+	if v := p.byKey("tix"); v == nil || *v != 1.12 {
+		t.Errorf("byKey(tix) = %v, want 1.12", v)
+	}
+	if p := PricesFrom("", "", "", "", "", ""); p != (Prices{}) {
 		t.Errorf("PricesFrom with no prices = %+v, want all nil", p)
+	}
+}
+
+func TestPrintingPrice(t *testing.T) {
+	prices := PricesFrom("1.00", "5.00", "9.00", "0.80", "4.00", "0.10")
+	tests := []struct {
+		finishes []string
+		key      string
+		want     float64 // 0 means no price
+	}{
+		// Without finishes (no ownership data), Scryfall's price
+		{nil, "usd", 1.00},
+		{[]string{"nonfoil"}, "usd", 1.00},
+		{[]string{"normal"}, "eur", 0.80},
+		{[]string{"foil"}, "usd", 5.00},
+		{[]string{"nonfoil", "foil"}, "eur", 4.00},
+		{[]string{"etched"}, "usd", 9.00},
+		// No EUR etched price: etched uses EUR foil
+		{[]string{"etched"}, "eur", 4.00},
+		{[]string{"foil", "etched"}, "usd", 9.00},
+		// tix has no finishes
+		{[]string{"foil"}, "tix", 0.10},
+	}
+	for _, tt := range tests {
+		p := &Printing{Card: &Card{Prices: prices}, Finishes: tt.finishes}
+		got := p.price(tt.key)
+		if got == nil || *got != tt.want {
+			t.Errorf("price(%s) with finishes %v = %v, want %v", tt.key, tt.finishes, got, tt.want)
+		}
+	}
+
+	// An owned finish without a price has none, even if another finish has one.
+	p := &Printing{Card: &Card{Prices: PricesFrom("", "5.00", "", "", "", "")}, Finishes: []string{"nonfoil"}}
+	if got := p.price("usd"); got != nil {
+		t.Errorf("price(usd) of a nonfoil copy without a nonfoil price = %v, want nil", *got)
 	}
 }

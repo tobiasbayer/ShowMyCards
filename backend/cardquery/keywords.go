@@ -306,7 +306,7 @@ func (q *Query) compileTerm(t token) (pred, error) {
 
 	case "usd", "eur", "tix":
 		return numberTerm(t, func(p *Printing) (float64, bool) {
-			price := p.Prices.byKey(key)
+			price := p.price(key)
 			if price == nil {
 				return 0, false
 			}

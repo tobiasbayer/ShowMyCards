@@ -41,7 +41,7 @@ var orderKeys = map[string]func(p *Printing) sortValue{
 
 func priceOrder(key string) func(p *Printing) sortValue {
 	return func(p *Printing) sortValue {
-		price := p.Prices.byKey(key)
+		price := p.price(key)
 		if price == nil {
 			return sortValue{missing: true}
 		}

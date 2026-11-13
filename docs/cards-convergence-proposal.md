@@ -310,6 +310,7 @@ These override the proposal where they differ.
 - The page has only a search input, a scope dropdown, a language dropdown and a result counter. This replaced the original `Collection | Catalog` switch and the location select; see "Merged scope and local search" below. It has no stats row, grid/table toggle, owned/not-owned post-filter or per-tile storage dropdown.
   - The language dropdown came back on 2026-11-13; see "Follow-up: language dropdown".
   - The advanced search builder came back the same day, as a popover behind an icon in the search field; see "Follow-up: advanced search builder".
+  - A sort menu (default order, or by price) came back the same day, after the language dropdown; see "Follow-up: price sort".
 - **Result counter.** It sits at the right end of the header row and shows quiet text such as "120 cards".
   - **Collection:** the number of physical copies matching the name and location filter. This is the same unit as `card_count` on the storage overview (`GET /api/storage/with-counts`, `SUM(quantity)`). Its tooltip says "N copies in M printings". Verified: a location's count equals its storage-overview count, and the sum over all locations plus unassigned equals the total.
   - **Catalog:** Scryfall's `total_cards` for the query, not just the loaded pages.
@@ -318,7 +319,7 @@ These override the proposal where they differ.
   - The page lands in "My collection" (all owned printings, newest first).
   - The query is kept when the scope changes.
   - The navbar search goes to "All cards".
-  - State lives in the URL (`?source=&q=&location=&lang=`; the dropdowns map onto these).
+  - State lives in the URL (`?source=&q=&location=&lang=&sort=`; the dropdowns map onto these).
   - Every scope scrolls infinitely.
 - **Collection name filter** matches the English name and the printed (localized) name, like today's search page.
 
@@ -332,6 +333,7 @@ These override the proposal where they differ.
   - **Unit (changed 2026-11-13):** per printing, capped at the owned badge's count. See "Follow-up: per-printing deck badge".
   - **Catalog:** the same per-printing badge, shown only on owned printings.
 - On hover, a single "+" opens the Add popover. Clicking anywhere else on the tile opens the panel.
+- **Price line (2026-11-13):** only while the results are ordered by price, a second line under the caption shows the price they are ordered by, or a muted "—". See "Follow-up: price sort".
 
 ### Add popover
 - Collection only; adding to a deck lives in the panel.
@@ -644,6 +646,28 @@ The user asked for the old search page's "Advanced" builder (`SearchBuilderModal
 
 **Checks:** svelte-check reports 0 errors; eslint and prettier are clean; 319 server tests pass. The client (browser) tests weren't run, since no component spec covers these files.
 
+### Follow-up: price sort (2026-11-13)
+
+The old Inventory Browser (removed in `abde672`) could sort by price: Recent, Price: highest first, Price: lowest first. Its price was the highest unit price among the finishes owned. The Cards page had no sort control, although `order:usd|eur` already worked when typed.
+
+**Settled (grilling):**
+- **Control:** a sort menu after the language dropdown, the same `<details class="dropdown">` pattern (`SortMenu.svelte`), with an up-down arrow icon.
+- **Entries:** the scope's default order, called "Newest" in collection scopes and "Name" in All cards (Scryfall's default order), then "Price: highest first" and "Price: lowest first". Nothing else for now; the engine supports more `order:` keys if they are wanted later.
+- **Works like the language dropdown:** a pick is `?sort=<usd|eur>-<desc|asc>` and carries over across scopes (every scope can sort by price). The server load appends `order:<cur> direction:<dir>` unless the query has its own `order:` (or the engine's `sort:` alias). A typed order wins, and it dims and disables the menu, whose tooltip names the clause.
+- **Currency at pick time:** a price pick takes the currency preference (`lib/stores/currency.svelte.ts`, browser-only) when it is picked, so the URL says the currency and the server load needs no cookie. After a currency change in Settings, the next pick uses the new one; picking the same direction again switches it.
+- **The price in collection scopes:** the highest price among the finishes owned **in the current scope**, so a foil copy counts as foil (finish → price as `getTreatmentPrice`: foil → `usd_foil`/`eur_foil`, etched → `usd_etched`/`eur_foil`, anything else → `usd`/`eur`). The same number drives `order:usd|eur`, the `usd`/`eur` filters and the tile. `finish:` stays a pure filter and doesn't narrow which finishes count. An owned finish without a price doesn't borrow another finish's price.
+- **All cards:** Scryfall sorts it; the tile shows the printing's price by Scryfall's rule (nonfoil, else foil, else etched).
+- **Tile:** only while ordered by `usd`/`eur` (picked or typed), a second line under the caption shows the price in that order's currency (`$12.40`), or a muted "—" without a price (those sort last). No finish mark; the panel has the per-finish prices. A typed `order:` on anything else (`order:name`, `order:tix`) shows no price.
+- **A sort alone never searches Scryfall:** All cards without a query stays empty.
+
+**Files:**
+- `backend/cardquery/card.go`: `Prices` keeps every finish's price; `byKey` is Scryfall's fallback rule; `Printing.price` takes the owned finishes (no finishes, or `tix`, falls back to `byKey`). `order.go` and the `usd`/`eur`/`tix` terms use it. Tests in `query_test.go` (`TestPrintingPrice`, new `TestMatch`/`TestSort` cases). The `bolt_sld_foil` fixture is now owned as foil, as a foil-only printing must be.
+- `frontend/src/routes/search/prototype/sort.ts` (+ tests): `parseSort`, `sortParam`, `typedOrderClause`, `withOrder`, `orderCurrency`.
+- `frontend/src/lib/utils/card-prices.ts` (+ tests): `printingPrice` and `highestOwnedPrice`, which mirror the engine.
+- `+page.server.ts`, `state.svelte.ts` (`pickedSort`, `setSort`, `priceCurrency`, `ownedFinishes`; "Load more" sends the order too), `CardsHeader.svelte`, `CardTile.svelte`, `SortMenu.svelte` (new).
+
+**Checks:** `go test` passes for `cardquery` and `api`; golangci-lint reports 0 issues in `cardquery`; svelte-check reports 0 errors; eslint and prettier are clean; 352 server tests pass. Not yet verified in the browser: the sandbox blocks binding local ports, so neither the dev servers nor the client (browser) tests could run here.
+
 ## Local search engine (2026-11-10)
 
 The user asked to implement the local Scryfall syntax and to wire it into the prototype only (not today's inventory pages). The engine is its own package so it can move to `main` as "Suggested order" step 2.
@@ -675,9 +699,10 @@ The user asked to implement the local Scryfall syntax and to wire it into the pr
 - `f:` matches legal or restricted. `is:commander` checks the front face (a legendary creature, vehicle, spacecraft or background, or "can be your commander"), and the card must not be banned in Commander.
 - Also supported beyond §4's list: `fo:`, `name:`, `not:`, `pt`, `wm:`, `border:`, `frame:`, `has:watermark`, `banned:`, `restricted:`, `ci:` and `l:`.
 - Collection keywords: `finish:`, `qty` and `free` count only copies **in the current scope** (what the tile shows). `free` is per printing, like the deck badge (since 2026-11-13).
-- Sort: newest added first by default. `order:` takes name, set, released (newest first), rarity, color, usd/eur/tix (missing prices last), cmc/mv, power, toughness, edhrec and artist, with `direction:asc|desc`.
+- Sort: newest added first by default. `order:` takes name, set, released (newest first), rarity, color, usd/eur/tix (missing prices last), cmc/mv, power, toughness, edhrec and artist, with `direction:asc|desc`. The Cards page's sort menu appends `order:usd|eur direction:…` (see "Follow-up: price sort").
 
 **Deliberate differences from Scryfall:**
+- `usd`/`eur` (as `order:` keys and as filters) are the highest price among the finishes owned in scope, so a foil copy counts as foil (since 2026-11-13). Scryfall uses the nonfoil price and falls back to foil, then etched. querycompare therefore differs on price queries for printings owned only in foil or etched.
 - Unknown values (format, rarity, layout, language, `is:`, `order:`) are errors. Scryfall silently ignores such terms.
 - The collection hides nothing by default: no language filter, and tokens and other extras are included.
 - `kw:` is an exact match, and its values aren't validated (there is no keyword list).

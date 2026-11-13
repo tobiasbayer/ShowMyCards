@@ -19,6 +19,7 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import type { ProtoData } from './prototype/state.svelte';
 import { ANY_LANGUAGE, parseLanguage } from './prototype/language';
+import { parseSort, withOrder } from './prototype/sort';
 
 // Load storage locations for the dropdown and the saved default language
 export const load: PageServerLoad = async ({ fetch, url }) => {
@@ -36,15 +37,18 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 // Scryfall page for `q`. Both read deck availability (per card, and free copies per
 // owned printing) from inventory results. A picked language (`?lang=`) is added to
 // the query unless the query names one; without a pick the collection shows every
-// language and Scryfall gets the Settings language from the backend.
+// language and Scryfall gets the Settings language from the backend. A picked price
+// sort (`?sort=`) is added as `order:`/`direction:` unless the query has an `order:`.
 async function loadPrototype(fetch: typeof globalThis.fetch, url: URL): Promise<ProtoData> {
 	const source = url.searchParams.get('source') === 'catalog' ? 'catalog' : 'collection';
 	const query = url.searchParams.get('q')?.trim() ?? '';
 	const language = parseLanguage(url.searchParams.get('lang'));
+	const sort = parseSort(url.searchParams.get('sort'));
 	const data: ProtoData = {
 		source,
 		query,
 		language,
+		sort,
 		collection: [],
 		catalog: { cards: [], hasMore: false, total: 0 },
 		availability: {},
@@ -54,7 +58,10 @@ async function loadPrototype(fetch: typeof globalThis.fetch, url: URL): Promise<
 	try {
 		if (source === 'collection') {
 			const params = new URLSearchParams();
-			const q = withLanguage(query, language === ANY_LANGUAGE ? '' : (language ?? ''));
+			const q = withLanguage(
+				withOrder(query, sort),
+				language === ANY_LANGUAGE ? '' : (language ?? '')
+			);
 			if (q) params.set('q', q);
 			const location = url.searchParams.get('location');
 			if (location === 'unassigned') params.set('storage_location_id', 'null');
@@ -74,8 +81,9 @@ async function loadPrototype(fetch: typeof globalThis.fetch, url: URL): Promise<
 
 		// Catalog only needs the collection for the deck badge, so a failure there just hides it.
 		const collection = fetchAllInventoryCards(fetch).catch(() => []);
+		// A sort alone never starts a Scryfall search: it only orders one.
 		if (query) {
-			const params = new URLSearchParams({ q: query });
+			const params = new URLSearchParams({ q: withOrder(query, sort) });
 			if (language) params.set('lang', language);
 			const response = await fetch(`${BACKEND_URL}/api/search?${params}`);
 			if (response.ok) {

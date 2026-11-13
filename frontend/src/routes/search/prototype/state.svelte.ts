@@ -28,6 +28,8 @@ import {
 	type Stack
 } from './stacks';
 import { defaultLanguage, languageParam } from './language';
+import type { Currency } from '$lib/stores/currency.svelte';
+import { orderCurrency, sortParam, withOrder, type PriceSort } from './sort';
 
 export type { LocationFilter, Stack } from './stacks';
 
@@ -46,6 +48,8 @@ export interface ProtoData {
 	query: string;
 	/** The language picked in the dropdown (`?lang=`, a code or `any`); null = the scope's default. */
 	language: string | null;
+	/** The price sort picked in the menu (`?sort=`); null = the scope's default order. */
+	sort: PriceSort | null;
 	collection: EnhancedCardResult[];
 	/** `total` is Scryfall's match count for the query, not just the loaded pages. */
 	catalog: { cards: EnhancedCardResult[]; hasMore: boolean; total: number };
@@ -343,6 +347,13 @@ export function ownedCount(card: EnhancedCardResult, filter: LocationFilter = 'a
 		.reduce((sum, s) => sum + s.quantity, 0);
 }
 
+/** The finishes of this printing's copies in the scope, which price it in a price sort. */
+export function ownedFinishes(card: EnhancedCardResult, filter: LocationFilter = 'all'): string[] {
+	return effectiveStacks(card)
+		.filter((s) => s.quantity > 0 && matchesLocation(s, filter))
+		.map((s) => s.finish);
+}
+
 export function ownsOtherPrinting(card: EnhancedCardResult): boolean {
 	return card.inventory.other_printings.some((row) => row.quantity > 0);
 }
@@ -425,6 +436,8 @@ export class CardsView {
 	readonly pickedLanguage: string | null;
 	/** The `scryfall_default_language` setting: what All cards shows without a pick. */
 	readonly settingsLanguage: string;
+	/** The price sort picked in the menu; null keeps the scope's default order. */
+	readonly pickedSort: PriceSort | null;
 	selected = $state<EnhancedCardResult | null>(null);
 
 	catalog = $state.raw<EnhancedCardResult[]>([]);
@@ -445,6 +458,7 @@ export class CardsView {
 		this.query = proto.query;
 		this.pickedLanguage = proto.language;
 		this.settingsLanguage = settingsLanguage;
+		this.pickedSort = proto.sort;
 		this.collection = proto.collection;
 		this.catalog = proto.catalog.cards;
 		this.hasMore = proto.catalog.hasMore;
@@ -463,6 +477,14 @@ export class CardsView {
 	/** The language the results are in: the pick, else the scope's default. */
 	get language(): string {
 		return this.pickedLanguage ?? defaultLanguage(this.source, this.settingsLanguage);
+	}
+
+	/**
+	 * The currency the results are ordered by when they are ordered by price (picked
+	 * or typed in the search that ran), else null. Tiles show their price only then.
+	 */
+	get priceCurrency(): Currency | null {
+		return orderCurrency(this.query, this.pickedSort);
 	}
 
 	/**
@@ -560,7 +582,7 @@ export class CardsView {
 			const next = this.catalogPage + 1;
 			const lang = this.pickedLanguage ? `&lang=${encodeURIComponent(this.pickedLanguage)}` : '';
 			const res = await fetch(
-				`/api/search?q=${encodeURIComponent(this.query)}&page=${next}${lang}`
+				`/api/search?q=${encodeURIComponent(withOrder(this.query, this.pickedSort))}&page=${next}${lang}`
 			);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const data = (await res.json()) as SearchResponse;
@@ -604,11 +626,23 @@ export class CardsView {
 		this.navigate(this.source, undefined, language);
 	}
 
+	/** Applies a sort from the menu (null = the scope's default) and reruns `query`. */
+	setSort(sort: PriceSort | null, query: string) {
+		this.query = query;
+		this.navigate(this.source, undefined, this.pickedLanguage, sort);
+	}
+
 	/**
-	 * Every search, scope and language change goes through the server load. A picked
-	 * language carries over to another scope unless it is that scope's default.
+	 * Every search, scope, language and sort change goes through the server load. A
+	 * picked language carries over to another scope unless it is that scope's default;
+	 * a picked sort always does (every scope can sort by price).
 	 */
-	navigate(source: Source, location?: LocationFilter, language = this.pickedLanguage) {
+	navigate(
+		source: Source,
+		location?: LocationFilter,
+		language = this.pickedLanguage,
+		sort = this.pickedSort
+	) {
 		const params = this.#params();
 		params.set('source', source);
 		if (location === 'all') params.delete('location');
@@ -618,6 +652,9 @@ export class CardsView {
 		const lang = languageParam(language, source, this.settingsLanguage);
 		if (lang) params.set('lang', lang);
 		else params.delete('lang');
+		const sortValue = sortParam(sort);
+		if (sortValue) params.set('sort', sortValue);
+		else params.delete('sort');
 		goto(resolve(searchPath(params) as '/search'), { keepFocus: true, noScroll: true });
 	}
 }

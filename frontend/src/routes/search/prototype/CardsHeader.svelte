@@ -2,7 +2,7 @@
 	PROTOTYPE, throwaway. Page chrome for the Cards prototype: one search field
 	(applied on Enter) with the advanced search builder behind its sliders icon,
 	one scope dropdown (All cards, My collection, a location, Unassigned), a
-	language dropdown and a result count.
+	language dropdown, a sort menu and a result count.
 -->
 <script lang="ts">
 	import { navigating } from '$app/state';
@@ -11,6 +11,8 @@
 	import { typedLanguageClause } from '$lib/utils/language-clause';
 	import LanguageMenu from './LanguageMenu.svelte';
 	import SearchBuilder from './SearchBuilder.svelte';
+	import SortMenu from './SortMenu.svelte';
+	import { typedOrderClause } from './sort';
 	import type { CardsView, Scope } from './state.svelte';
 
 	let { view }: { view: CardsView } = $props();
@@ -46,6 +48,8 @@
 	const inCollection = $derived(view.scope !== 'catalog');
 	// A language typed in the search wins over the dropdown (on the backend too).
 	const typedClause = $derived(typedLanguageClause(draft));
+	// Likewise a typed order: wins over the sort menu.
+	const typedOrder = $derived(typedOrderClause(draft));
 
 	// Collection counts copies (as the storage overview does); All cards shows Scryfall's total.
 	const count = $derived(
@@ -114,6 +118,12 @@
 		value={view.language}
 		{typedClause}
 		onChange={(language) => view.setLanguage(language, draft)} />
+
+	<SortMenu
+		value={view.pickedSort}
+		defaultLabel={inCollection ? 'Newest' : 'Name'}
+		typedClause={typedOrder}
+		onChange={(sort) => view.setSort(sort, draft)} />
 
 	{#if count > 0}
 		<span

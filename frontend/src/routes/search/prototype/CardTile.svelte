@@ -2,14 +2,23 @@
 	PROTOTYPE, throwaway. Minimal card tile: image, "Name · SET", a deck badge
 	(copies of this printing free for decks) and an ownership badge, a hover "+" that opens the
 	Add popover, and a hover checkmark that selects the tile for bulk actions.
+	While the results are ordered by price, a second line shows the price they are
+	ordered by (in the collection, the highest price among the finishes in scope).
 	While anything is selected, a click toggles the tile instead of opening the
 	panel, Shift-click selects a range, and "+" is hidden.
 -->
 <script lang="ts">
 	import { getDisplayName, type EnhancedCardResult } from '$lib';
+	import { highestOwnedPrice, printingPrice } from '$lib/utils/card-prices';
 	import { Check, Layers, Plus } from '@lucide/svelte';
 	import AddPopover from './AddPopover.svelte';
-	import { locationName, ownedCount, ownsOtherPrinting, type CardsView } from './state.svelte';
+	import {
+		locationName,
+		ownedCount,
+		ownedFinishes,
+		ownsOtherPrinting,
+		type CardsView
+	} from './state.svelte';
 
 	let { card, view }: { card: EnhancedCardResult; view: CardsView } = $props();
 
@@ -37,6 +46,18 @@
 	// Per printing, so the tile holding a free copy stands out. Never more than the
 	// copies the owned badge counts, so a location scope caps it too.
 	const free = $derived(Math.min(view.freeForDecks(card), count));
+
+	// The number the results are sorted by, so the tiles read in order; null when
+	// they aren't sorted by price.
+	const price = $derived.by(() => {
+		const cur = view.priceCurrency;
+		if (!cur) return null;
+		const value =
+			view.source === 'collection'
+				? highestOwnedPrice(card.prices, ownedFinishes(card, view.location), cur)
+				: printingPrice(card.prices, cur);
+		return value === undefined ? '—' : `${cur === 'eur' ? '€' : '$'}${value.toFixed(2)}`;
+	});
 </script>
 
 <div class="group {view.selecting ? 'select-none' : ''}">
@@ -129,4 +150,13 @@
 			{/if}
 		</span>
 	</div>
+	{#if price !== null}
+		<div
+			class="mt-0.5 px-0.5 text-sm tabular-nums leading-tight {price === '—'
+				? 'text-base-content/30'
+				: 'text-base-content/70'}"
+			title={price === '—' ? 'No price known' : undefined}>
+			{price}
+		</div>
+	{/if}
 </div>

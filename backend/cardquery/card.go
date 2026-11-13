@@ -1,6 +1,7 @@
 package cardquery
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -24,43 +25,82 @@ type Printing struct {
 	AddedAt time.Time
 }
 
-// Prices are a printing's prices. USD and EUR fall back to the foil and then
-// the etched price, as Scryfall does for foil-only printings. Nil means no price.
+// Prices are a printing's prices per finish. Nil means no price.
 type Prices struct {
-	USD *float64
-	EUR *float64
-	Tix *float64
+	USD       *float64
+	USDFoil   *float64
+	USDEtched *float64
+	EUR       *float64
+	EURFoil   *float64
+	Tix       *float64
 }
 
+// byKey is the printing's price as Scryfall reads it: USD and EUR fall back to
+// the foil and then the etched price, so foil-only printings have one too.
 func (p Prices) byKey(key string) *float64 {
 	switch key {
 	case "usd":
-		return p.USD
+		return cmp.Or(p.USD, p.USDFoil, p.USDEtched)
 	case "eur":
-		return p.EUR
+		return cmp.Or(p.EUR, p.EURFoil)
 	case "tix":
 		return p.Tix
 	}
 	return nil
 }
 
+// byFinish is the price of one finish. Scryfall has no EUR etched price, so
+// etched uses EUR foil, as the price display does.
+func (p Prices) byFinish(key, finish string) *float64 {
+	switch {
+	case key == "usd" && finish == "foil":
+		return p.USDFoil
+	case key == "usd" && finish == "etched":
+		return p.USDEtched
+	case key == "usd":
+		return p.USD
+	case key == "eur" && (finish == "foil" || finish == "etched"):
+		return p.EURFoil
+	case key == "eur":
+		return p.EUR
+	}
+	return nil
+}
+
+// price is the printing's price for an order: or price term: the highest price
+// among the finishes owned in scope, so a foil copy counts as foil. Without
+// finishes, and for tix (which has no finishes), it is Scryfall's price.
+func (p *Printing) price(key string) *float64 {
+	if len(p.Finishes) == 0 || key == "tix" {
+		return p.Prices.byKey(key)
+	}
+	var highest *float64
+	for _, f := range p.Finishes {
+		if v := p.Prices.byFinish(key, f); v != nil && (highest == nil || *v > *highest) {
+			highest = v
+		}
+	}
+	return highest
+}
+
 // PricesFrom builds Prices from Scryfall's price strings ("" means none).
 func PricesFrom(usd, usdFoil, usdEtched, eur, eurFoil, tix string) Prices {
 	return Prices{
-		USD: firstPrice(usd, usdFoil, usdEtched),
-		EUR: firstPrice(eur, eurFoil),
-		Tix: firstPrice(tix),
+		USD:       parsePrice(usd),
+		USDFoil:   parsePrice(usdFoil),
+		USDEtched: parsePrice(usdEtched),
+		EUR:       parsePrice(eur),
+		EURFoil:   parsePrice(eurFoil),
+		Tix:       parsePrice(tix),
 	}
 }
 
-func firstPrice(values ...string) *float64 {
-	for _, v := range values {
-		if v == "" {
-			continue
-		}
-		if f, err := strconv.ParseFloat(v, 64); err == nil {
-			return &f
-		}
+func parsePrice(v string) *float64 {
+	if v == "" {
+		return nil
+	}
+	if f, err := strconv.ParseFloat(v, 64); err == nil {
+		return &f
 	}
 	return nil
 }
