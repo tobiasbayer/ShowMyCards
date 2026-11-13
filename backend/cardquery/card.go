@@ -17,7 +17,8 @@ type Printing struct {
 	Quantity int
 	// Finishes are the finishes of those copies (treatments such as "foil").
 	Finishes []string
-	// Free is the number of copies of this card (oracle) free for decks.
+	// Free is the number of copies of this printing, in the current scope, free
+	// for decks (at most Quantity).
 	Free int
 	// AddedAt is when the newest copy in scope was added.
 	AddedAt time.Time

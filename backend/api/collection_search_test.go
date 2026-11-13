@@ -2,11 +2,13 @@ package api
 
 import (
 	"encoding/json"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"testing"
@@ -171,6 +173,8 @@ func TestSearchCollection(t *testing.T) {
 		{"qty counts only copies in scope", "qty>=2", boxB, nil},
 		{"qty in the whole collection", "qty>=3", "", []string{fixtureBolt.id}},
 		{"free for decks", "free>0 c:r", "", []string{fixtureBoltDE.id, fixtureBolt.id}},
+		{"free counts only copies in scope", "free>=2", boxB, nil},
+		{"free in the whole collection", "free>=3", "", []string{fixtureBolt.id}},
 		{"English price for a German printing", "usd>0.5 lang:de", "", []string{fixtureBoltDE.id}},
 		{"order", "order:name", boxA, []string{fixtureDelver.id, fixtureJace.id, fixtureBolt.id}},
 	}
@@ -205,13 +209,44 @@ func TestSearchCollection_ResultCarriesAllRowsAndDeck(t *testing.T) {
 	if len(bolt.Inventory.ThisPrinting) != 2 || bolt.Inventory.TotalQuantity != 3 {
 		t.Errorf("expected both rows (3 copies), got %d rows, %d copies", len(bolt.Inventory.ThisPrinting), bolt.Inventory.TotalQuantity)
 	}
-	if bolt.Deck != (DeckAvailability{Owned: 4, Decked: 0, Free: 4}) {
-		t.Errorf("deck availability = %+v, want 4 owned, 4 free (both printings)", bolt.Deck)
+	wantBolt := DeckAvailability{Owned: 4, Decked: 0, Free: 4,
+		Printings: map[string]int{fixtureBolt.id: 3, fixtureBoltDE.id: 1}}
+	if !reflect.DeepEqual(bolt.Deck, wantBolt) {
+		t.Errorf("deck availability = %+v, want %+v (both printings)", bolt.Deck, wantBolt)
 	}
 
 	_, resp, _ = s.search(t, url.Values{"q": {"krenko"}})
-	if len(resp.Data) != 1 || resp.Data[0].Deck != (DeckAvailability{Owned: 1, Decked: 1, Free: 0}) {
-		t.Errorf("krenko deck availability = %+v, want 1 owned, 1 decked, 0 free", resp.Data)
+	wantKrenko := DeckAvailability{Owned: 1, Decked: 1, Free: 0, Printings: map[string]int{fixtureKrenko.id: 0}}
+	if len(resp.Data) != 1 || !reflect.DeepEqual(resp.Data[0].Deck, wantKrenko) {
+		t.Errorf("krenko deck availability = %+v, want %+v", resp.Data, wantKrenko)
+	}
+}
+
+func TestSearchCollection_FreeIsPerPrinting(t *testing.T) {
+	s := seedCollection(t)
+	// A deck pins all three copies of the English Bolt; the German one stays free.
+	deck := models.Deck{Name: "Burn"}
+	if err := s.db.Create(&deck).Error; err != nil {
+		t.Fatalf("failed to create deck: %v", err)
+	}
+	item := models.DeckItem{DeckID: deck.ID, OracleID: fixtureBolt.oracle, ScryfallID: fixtureBolt.id,
+		Zone: models.ZoneMain, DesiredQuantity: 3}
+	if err := s.db.Create(&item).Error; err != nil {
+		t.Fatalf("failed to create deck item: %v", err)
+	}
+
+	_, resp, _ := s.search(t, url.Values{"q": {"free>0 c:r"}})
+	if got, want := ids(resp), []string{fixtureBoltDE.id}; !slices.Equal(got, want) {
+		t.Errorf("free>0 = %v, want %v", got, want)
+	}
+
+	_, resp, _ = s.search(t, url.Values{"q": {"!\"lightning bolt\" lang:en"}})
+	if len(resp.Data) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(resp.Data))
+	}
+	want := map[string]int{fixtureBolt.id: 0, fixtureBoltDE.id: 1}
+	if got := resp.Data[0].Deck.Printings; !maps.Equal(got, want) {
+		t.Errorf("deck.printings = %v, want %v", got, want)
 	}
 }
 

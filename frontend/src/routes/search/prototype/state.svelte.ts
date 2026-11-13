@@ -46,7 +46,10 @@ export interface ProtoData {
 	collection: EnhancedCardResult[];
 	/** `total` is Scryfall's match count for the query, not just the loaded pages. */
 	catalog: { cards: EnhancedCardResult[]; hasMore: boolean; total: number };
-	/** oracle_id -> copies owned / decked / free across all printings (from the backend). */
+	/**
+	 * oracle_id -> copies owned / decked / free across all printings, plus the free
+	 * copies of each owned printing (from the backend).
+	 */
 	availability: Record<string, DeckAvailability>;
 	error: string | null;
 	/** A search the backend couldn't run; `code` picks the hint (see QueryErrorResponse). */
@@ -65,7 +68,7 @@ export interface QueryError {
 class Live {
 	/** cardId -> the printing's inventory rows. */
 	rows = $state<Record<string, Inventory[]>>({});
-	/** oracleId -> copies owned / decked / free. */
+	/** oracleId -> copies owned / decked / free, and free per printing. */
 	availability = $state<Record<string, DeckAvailability>>({});
 	/** Cards that gained copies here, so My collection lists them before a reload. */
 	owned = $state<Record<string, EnhancedCardResult>>({});
@@ -448,12 +451,13 @@ export class CardsView {
 		else if (loc && /^\d+$/.test(loc)) this.location = Number(loc);
 	}
 
-	/** Copies of this card (all printings) owned, committed to decks, and free for deck building. */
-	forDecks(card: EnhancedCardResult): DeckAvailability {
-		return (
-			live.availability[card.oracle_id] ??
-			this.availability[card.oracle_id] ?? { owned: 0, decked: 0, free: 0 }
-		);
+	/**
+	 * Copies of this printing (anywhere in the collection) free for deck building:
+	 * the most that can go into another deck without leaving any deck short.
+	 */
+	freeForDecks(card: EnhancedCardResult): number {
+		const availability = live.availability[card.oracle_id] ?? this.availability[card.oracle_id];
+		return availability?.printings?.[card.id] ?? 0;
 	}
 
 	/**

@@ -137,7 +137,7 @@ Requirements this places on the collection scopes:
 - **Collection-only keywords:**
   - `finish:foil|nonfoil|etched` matches the finish of your copies.
   - `qty>=N` matches by copies owned.
-  - `free>0` matches copies free for decks, counted per card like the deck badge and today's "available for deck building" filter.
+  - `free>0` matches copies free for decks, counted per printing and in scope like the deck badge (changed 2026-11-13; see "Follow-up: per-printing deck badge").
 - **Language:** collection queries match English **and** localized text, for names, the type line (`t:Kreatur`) and oracle or printed text (`o:"Karte ziehen"`). On two-faced cards any face can match, as on Scryfall. All cards behaves as Scryfall does.
 - **Errors:** an unsupported keyword, a collection keyword in All cards, or invalid syntax shows no results and one line of explanation, with a link to the other scope where that helps.
   - Example: "`art:` isn't available in your collection · Search All cards instead".
@@ -324,10 +324,9 @@ These override the proposal where they differ.
   - **Set code:** muted text.
 - **Owned badge:** a solid primary count for this printing, aggregated over finishes and locations. In a location-filtered Collection it counts only that location. In Catalog, a faint outline dot means "you own only other printings".
 - **Deck badge (user request):** "how many of my copies are available for deck building".
-  - **Look:** the Lucide `Layers` icon (the sidebar's Decks icon) plus the free count. Green when free > 0; a grey 0 when every copy is in decks; hidden when no printing of the card is owned.
-  - **Unit:** the count is per card (oracle), not per printing, matching the backend allocation (`InventoryCard.deck.free`). It can exceed the printing's owned count.
-  - **Catalog:** the badge also shows there, which repeats it on every printing of an owned card.
-  - **Not yet decided:** whether to cap it at the printing's count, and whether to keep it in Catalog.
+  - **Look:** the Lucide `Layers` icon (the sidebar's Decks icon) plus the free count. Green when free > 0; a grey 0 when every copy of this printing is in decks; hidden when this printing isn't owned (in scope).
+  - **Unit (changed 2026-11-13):** per printing, capped at the owned badge's count. See "Follow-up: per-printing deck badge".
+  - **Catalog:** the same per-printing badge, shown only on owned printings.
 - On hover, a single "+" opens the Add popover. Clicking anywhere else on the tile opens the panel.
 
 ### Add popover
@@ -571,6 +570,25 @@ The user asked for the inventory browser's "Browse" buttons to open the Cards pa
 - **Kept:** `/inventory/recent`, which has no Cards-page equivalent yet (it needs sort by newest), and the `selection` store, which `CardResultCard` and `card-collection` still use.
 - **Gaps on the Cards page that `/inventory/all` covered:** sort by price, and a per-card list of locations with copy counts. The detail panel's "Your copies" section partly covers the second.
 
+### Follow-up: per-printing deck badge (2026-11-13)
+
+The user owns seven Sol Rings over six printings, with all but one in decks. Searching "Sol Ring" gave six tiles, each with a deck badge of 1, so they couldn't tell which printing held the free copy and go to its location.
+
+- **Cause:** the badge was per card (`owned − demand` for the oracle), copied onto every printing.
+- **Settled (grilling):**
+  - **Only the Decks feature decides.** A copy a deck wants is not free, whatever its storage location; a copy no deck wants is free. Locations, including "Deck …" boxes, play no part, because other users model physical decks differently.
+  - **The badge counts per printing:** `max(0, min(owned(p) − pinned(p), card free))`. Decks pinning the printing take its copies first. Any-printing slots may take any copy, hence the cap. It is an "up to" figure: the tiles of one card can add up to more than its free count (own BLC×2 and ZNC×1, one any-printing slot: BLC 2, ZNC 1).
+  - **Capped by scope:** never more than the owned badge beside it.
+  - **Catalog:** the same badge, shown only on owned printings.
+  - **`free` keyword:** follows the badge (per printing, in scope).
+  - **Panel:** unchanged. "Your copies" already lists locations. The Decks feature can't say *which* copy of a printing is decked, so no stack is marked free.
+  - **Finish:** still ignored.
+  - **Unchanged:** deck pages, the Add-to-deck notice and the per-card `owned`/`decked`/`free`.
+- **Any-printing slots stay vague.** If six decks want "Sol Ring, any printing", every printing shows 1, which is true. Only pinned slots single out a printing.
+- **Pin by default:** Add to deck starts with "Pin this printing" ticked when every card being added is an owned printing (Cards page panel and multi-select; `pinByDefault` on `AddToDeckModal`). In All cards an unowned printing stays unticked, because pinning it would count the card missing although another printing is owned. The old `CardResultCard` is unchanged.
+- **Backend:** `AvailabilityMap.PrintingFree` / `PrintingsFree` in `services/allocation.go`; `DeckAvailability.printings` (scryfall_id → free, optional) on `/inventory/search`, `/inventory/cards` and `/inventory/availability/:oracle_id`. The post-write refresh re-reads the last one, so every printing's tile of the card updates.
+- **Follow-up, not done:** a way to pin an existing deck slot to a printing on the deck page. Until then, remove the slot and add it again from the printing's tile.
+
 ## Local search engine (2026-11-10)
 
 The user asked to implement the local Scryfall syntax and to wire it into the prototype only (not today's inventory pages). The engine is its own package so it can move to `main` as "Suggested order" step 2.
@@ -601,7 +619,7 @@ The user asked to implement the local Scryfall syntax and to wire it into the pr
 - `usd`/`eur` fall back to the foil and then the etched price (as on Scryfall), after the English-printing fallback.
 - `f:` matches legal or restricted. `is:commander` checks the front face (a legendary creature, vehicle, spacecraft or background, or "can be your commander"), and the card must not be banned in Commander.
 - Also supported beyond §4's list: `fo:`, `name:`, `not:`, `pt`, `wm:`, `border:`, `frame:`, `has:watermark`, `banned:`, `restricted:`, `ci:` and `l:`.
-- Collection keywords: `finish:` and `qty` count only copies **in the current scope** (what the tile shows). `free` is per card, like the deck badge.
+- Collection keywords: `finish:`, `qty` and `free` count only copies **in the current scope** (what the tile shows). `free` is per printing, like the deck badge (since 2026-11-13).
 - Sort: newest added first by default. `order:` takes name, set, released (newest first), rarity, color, usd/eur/tix (missing prices last), cmc/mv, power, toughness, edhrec and artist, with `direction:asc|desc`.
 
 **Deliberate differences from Scryfall:**
@@ -649,7 +667,7 @@ Other Scryfall errors in All cards show "Scryfall couldn't read this search" (or
 
 ### API and code
 - **Ignored `unique=` parameter:** `/api/search` ignores a `unique=` query parameter and reads the unique mode from settings (`backend/api/search.go`). The `unique:prints` keyword inside `q` works, and both `oracleid:` and `oracle_id:` are valid Scryfall syntax. This is why "Other printings" on today's `/cards/[id]` page is incomplete: it sends `&unique=prints`.
-- **Deck availability exists only on inventory results.** `InventoryCard.deck {owned, decked, free}` is per card (oracle), finish-blind, and computed by `services/allocation.go`. Only `/api/inventory/cards` serves it; search results do not, so the prototype builds an oracle → availability map from the full collection.
+- **Deck availability exists only on inventory results.** `InventoryCard.deck {owned, decked, free}` is per card (oracle), finish-blind, and computed by `services/allocation.go`. Since 2026-11-13 it also carries `printings` (free copies per owned printing). Only `/api/inventory/cards` serves it; search results do not, so the prototype builds an oracle → availability map from the full collection.
 - **A mistyped helper causes the existing type errors.** `fetchAllInventoryCards` (`frontend/src/lib/server/inventory-cards.ts`) returns `InventoryCard`s at runtime but is typed `EnhancedCardResult[]`. That mismatch is the source of the 16 svelte-check errors already on `main`, as is the `InventoryBrowser.svelte.spec.ts` fixtures lacking `deck` (6 failing tests on `main`).
 - **The inventory endpoint returns duplicates across pages.** On a real collection, `/api/inventory/cards` returned about 27% more entries across pages (`page_size=200`) than there were unique printings. This confirms the proposal's point that it pages by inventory rows. `fetchAllInventoryCards` hides it by merging on card ID.
 - **Fixed: the Auto-rule preview could differ from the real auto-sort.** The first preview called `POST /api/sorting-rules/evaluate` with `CardResult`-shaped data, like `RuleTester`, so rules on fields `CardResult` lacks (rarity, type line and so on) could resolve differently from the real auto-sort, which reads the full local card JSON. `RuleTester` still has this gap. The prototype now uses `GET /api/inventory/auto-location` (see "Usable on real data").
@@ -674,8 +692,9 @@ Other Scryfall errors in All cards show "Scryfall couldn't read this search" (or
 
 ## Open questions
 
-- **Deck badge unit:** keep the per-card free count, or cap it at the printing's owned count? Keep the badge in Catalog, show it only on owned printings, or drop it there?
-- **Physical-deck locations vs. the Decks feature** (see above).
+- ~~**Deck badge unit.**~~ Decided 2026-11-13: per printing, capped by scope, owned printings only in Catalog.
+- ~~**Physical-deck locations vs. the Decks feature.**~~ Decided 2026-11-13: only the Decks feature decides whether a copy is free; storage locations play no part.
+- **Pinning an existing deck slot:** the deck page can't pin a slot to a printing. Any-printing slots keep every printing's badge vague (see "Follow-up: per-printing deck badge").
 - **"In decks" section:** should it also show the free and committed counts? Not requested yet.
 - **Image format:** consider a larger Scryfall image format now that tiles are bigger.
 - **Face rule:** the rule between faces in the panel text is faint in the dark theme.

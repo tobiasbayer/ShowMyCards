@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"maps"
 	"testing"
 
 	"backend/models"
@@ -229,4 +230,97 @@ func TestAllocation_MultipleOraclesIndependent(t *testing.T) {
 
 	assertAvail(t, m.OracleAvailabilityFor("oracle-1"), 4, 2, 2, false)
 	assertAvail(t, m.OracleAvailabilityFor("oracle-2"), 1, 3, 0, true)
+}
+
+func computeMap(t *testing.T, db *gorm.DB) AvailabilityMap {
+	t.Helper()
+	m, err := NewAllocationService(db).ComputeAvailability(context.Background())
+	if err != nil {
+		t.Fatalf("ComputeAvailability failed: %v", err)
+	}
+	return m
+}
+
+func assertPrintingsFree(t *testing.T, m AvailabilityMap, oracleID string, want map[string]int) {
+	t.Helper()
+	got := m.PrintingsFree(oracleID)
+	if !maps.Equal(got, want) {
+		t.Errorf("PrintingsFree(%s) = %v, want %v", oracleID, got, want)
+	}
+	for id, n := range want {
+		if p := m.PrintingFree(oracleID, id); p != n {
+			t.Errorf("PrintingFree(%s, %s) = %d, want %d", oracleID, id, p, n)
+		}
+	}
+}
+
+func TestPrintingFree_EachDeckPinsItsOwnPrinting(t *testing.T) {
+	db := setupAllocationTestDB(t)
+
+	// Seven copies over six printings; six decks each pin one printing. Only
+	// the second copy of the first printing is free.
+	addInventory(t, db, "sol-ring", "blc", 2)
+	for _, printing := range []string{"woc", "ecc", "mic", "onc", "znc"} {
+		addInventory(t, db, "sol-ring", printing, 1)
+	}
+	for _, printing := range []string{"blc", "woc", "ecc", "mic", "onc", "znc"} {
+		deck := newDeck(t, db, "Deck "+printing)
+		addDeckItem(t, db, deck.ID, "sol-ring", printing, models.ZoneMain, 1)
+	}
+
+	m := computeMap(t, db)
+	assertAvail(t, m.OracleAvailabilityFor("sol-ring"), 7, 6, 1, false)
+	assertPrintingsFree(t, m, "sol-ring", map[string]int{
+		"blc": 1, "woc": 0, "ecc": 0, "mic": 0, "onc": 0, "znc": 0,
+	})
+}
+
+func TestPrintingFree_AnyPrintingSlotIsUpTo(t *testing.T) {
+	db := setupAllocationTestDB(t)
+	deck := newDeck(t, db, "Any")
+
+	// Two of three copies are free, and the deck takes whichever is left, so
+	// either printing can give up to two (or its own count).
+	addInventory(t, db, "oracle-1", "blc", 2)
+	addInventory(t, db, "oracle-1", "znc", 1)
+	addDeckItem(t, db, deck.ID, "oracle-1", "", models.ZoneMain, 1)
+
+	assertPrintingsFree(t, computeMap(t, db), "oracle-1", map[string]int{"blc": 2, "znc": 1})
+}
+
+func TestPrintingFree_OverSubscribedPinnedPrinting(t *testing.T) {
+	db := setupAllocationTestDB(t)
+	deck := newDeck(t, db, "Pinned")
+
+	// The deck pins scry-A (1 owned, 3 wanted): nothing of scry-A is free, and
+	// scry-B gives at most the card's single free copy.
+	addInventory(t, db, "oracle-1", "scry-A", 1)
+	addInventory(t, db, "oracle-1", "scry-B", 3)
+	addDeckItem(t, db, deck.ID, "oracle-1", "scry-A", models.ZoneMain, 3)
+
+	assertPrintingsFree(t, computeMap(t, db), "oracle-1", map[string]int{"scry-A": 0, "scry-B": 1})
+}
+
+func TestPrintingFree_MaybeZoneDoesNotPin(t *testing.T) {
+	db := setupAllocationTestDB(t)
+	deck := newDeck(t, db, "Maybe")
+
+	addInventory(t, db, "oracle-1", "scry-A", 1)
+	addDeckItem(t, db, deck.ID, "oracle-1", "scry-A", models.ZoneMaybe, 1)
+
+	assertPrintingsFree(t, computeMap(t, db), "oracle-1", map[string]int{"scry-A": 1})
+}
+
+func TestPrintingFree_UnownedPrinting(t *testing.T) {
+	db := setupAllocationTestDB(t)
+
+	addInventory(t, db, "oracle-1", "scry-A", 2)
+
+	m := computeMap(t, db)
+	if got := m.PrintingFree("oracle-1", "scry-other"); got != 0 {
+		t.Errorf("unowned printing: PrintingFree = %d, want 0", got)
+	}
+	if got := m.PrintingsFree("oracle-unknown"); got != nil {
+		t.Errorf("unknown card: PrintingsFree = %v, want nil", got)
+	}
 }

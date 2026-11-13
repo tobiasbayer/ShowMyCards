@@ -15,6 +15,7 @@
 		deleteCopies,
 		locationName,
 		moveCopies,
+		ownedCount,
 		refreshCards,
 		resortCopies,
 		scopeRows,
@@ -230,6 +231,7 @@
 		open
 		bulk={inCollection}
 		cards={deckCards}
+		pinByDefault={cards.length > 0 && cards.every((c) => ownedCount(c) > 0)}
 		onClose={() => (addingToDeck = false)}
 		onAdded={onDeckAdded} />
 {/if}

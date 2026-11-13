@@ -1,6 +1,6 @@
 <!--
 	PROTOTYPE, throwaway. Minimal card tile: image, "Name · SET", a deck badge
-	(copies free for decks) and an ownership badge, a hover "+" that opens the
+	(copies of this printing free for decks) and an ownership badge, a hover "+" that opens the
 	Add popover, and a hover checkmark that selects the tile for bulk actions.
 	While anything is selected, a click toggles the tile instead of opening the
 	panel, Shift-click selects a range, and "+" is hidden.
@@ -34,8 +34,9 @@
 	// While selecting, the ring marks checked tiles rather than the panel's card.
 	const ringed = $derived(view.selecting ? checked : isSelected);
 	const name = $derived(getDisplayName(card));
-	// Per card, not per printing: decks ask for a card, any printing fills the slot.
-	const deck = $derived(view.forDecks(card));
+	// Per printing, so the tile holding a free copy stands out. Never more than the
+	// copies the owned badge counts, so a location scope caps it too.
+	const free = $derived(Math.min(view.freeForDecks(card), count));
 </script>
 
 <div class="group {view.selecting ? 'select-none' : ''}">
@@ -100,14 +101,14 @@
 			<span class="shrink-0 text-xs uppercase text-base-content/40">· {card.set_code}</span>
 		{/if}
 		<span class="ml-auto flex shrink-0 items-center gap-1 pl-1">
-			{#if deck.owned > 0}
-				<span class="tooltip tooltip-top flex" data-tip="Free for deck building">
+			{#if count > 0}
+				<span class="tooltip tooltip-top flex" data-tip="Free for deck building (this printing)">
 					<span
 						class="badge badge-sm gap-0.5 rounded-full px-1.5 font-semibold tabular-nums
-							{deck.free > 0 ? 'badge-soft badge-success' : 'badge-ghost text-base-content/40'}"
+							{free > 0 ? 'badge-soft badge-success' : 'badge-ghost text-base-content/40'}"
 						role="img"
-						aria-label="Free for deck building: {deck.free}">
-						<Layers class="size-3" aria-hidden="true" />{deck.free}
+						aria-label="Free for deck building (this printing): {free}">
+						<Layers class="size-3" aria-hidden="true" />{free}
 					</span>
 				</span>
 			{/if}

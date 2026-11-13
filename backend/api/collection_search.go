@@ -124,10 +124,7 @@ func (h *InventoryHandler) SearchCollection(c fiber.Ctx) error {
 		}
 		// The stored keys are authoritative for joining with the inventory.
 		qc.ID, qc.OracleID = card.ScryfallID, card.OracleID
-		p := &cardquery.Printing{
-			Card: qc,
-			Free: availability.OracleAvailabilityFor(card.OracleID).Free,
-		}
+		p := &cardquery.Printing{Card: qc}
 		for _, row := range rowsByPrinting[id] {
 			if !inScope(row) {
 				continue
@@ -138,6 +135,8 @@ func (h *InventoryHandler) SearchCollection(c fiber.Ctx) error {
 				p.AddedAt = row.CreatedAt
 			}
 		}
+		// Like the tile's deck badge: this printing's free copies, at most the copies in scope.
+		p.Free = min(availability.PrintingFree(card.OracleID, id), p.Quantity)
 		decoded[i] = p
 	})
 	printings := make([]*cardquery.Printing, 0, len(ids))
@@ -167,7 +166,7 @@ func (h *InventoryHandler) SearchCollection(c fiber.Ctx) error {
 		}
 		built[i] = &InventoryCard{
 			EnhancedCardResult: buildEnhancedCardResult(scryfallCard, rowsByPrinting[p.ID]),
-			Deck:               deckAvailability(availability.OracleAvailabilityFor(p.OracleID)),
+			Deck:               deckAvailability(availability, p.OracleID),
 		}
 	})
 	results := make([]InventoryCard, 0, len(matches))

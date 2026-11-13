@@ -417,12 +417,17 @@ export interface UpdateInventoryRequest {
  * Owned is total owned, Decked is copies locked by demand-zone deck items
  * (owned − free), and Free is copies not committed to any deck. Finish is not yet
  * part of this calculation (an M1 limitation, see the allocation service).
+ * Printings maps each owned printing (scryfall_id) to how many of its copies
+ * can go into another deck without leaving any deck short (see
+ * services.AvailabilityMap.PrintingFree). Each value is an "up to" figure, so
+ * the values of one card can add up to more than Free.
  * tygo:export
  */
 export interface DeckAvailability {
 	owned: number /* int */;
 	decked: number /* int */;
 	free: number /* int */;
+	printings?: { [key: string]: number /* int */ };
 }
 /**
  * InventoryCard is an inventory card result enriched with its deck-availability

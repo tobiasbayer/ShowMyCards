@@ -249,19 +249,26 @@ func (h *InventoryHandler) AutoLocation(c fiber.Ctx) error {
 }
 
 // Availability returns how many copies of a card (all printings) are owned,
-// committed to decks, and free for deck building.
+// committed to decks, and free for deck building, plus the free copies of each
+// owned printing.
 func (h *InventoryHandler) Availability(c fiber.Ctx) error {
 	availability, err := h.allocation.ComputeAvailability(c.RequestCtx())
 	if err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to compute deck availability", "allocation service failed", err)
 	}
-	return c.JSON(deckAvailability(availability.OracleAvailabilityFor(c.Params("oracle_id"))))
+	return c.JSON(deckAvailability(availability, c.Params("oracle_id")))
 }
 
-// deckAvailability maps the allocation service's per-Oracle result to the API shape.
-func deckAvailability(oa services.OracleAvailability) DeckAvailability {
-	return DeckAvailability{Owned: oa.Owned, Decked: oa.Owned - oa.Free, Free: oa.Free}
+// deckAvailability maps the allocation service's result for one card to the API shape.
+func deckAvailability(m services.AvailabilityMap, oracleID string) DeckAvailability {
+	oa := m.OracleAvailabilityFor(oracleID)
+	return DeckAvailability{
+		Owned:     oa.Owned,
+		Decked:    oa.Owned - oa.Free,
+		Free:      oa.Free,
+		Printings: m.PrintingsFree(oracleID),
+	}
 }
 
 // UpdateInventoryRequest represents the request body for updating an inventory item
@@ -369,11 +376,17 @@ func (h *InventoryHandler) Delete(c fiber.Ctx) error {
 // Owned is total owned, Decked is copies locked by demand-zone deck items
 // (owned − free), and Free is copies not committed to any deck. Finish is not yet
 // part of this calculation (an M1 limitation, see the allocation service).
+//
+// Printings maps each owned printing (scryfall_id) to how many of its copies
+// can go into another deck without leaving any deck short (see
+// services.AvailabilityMap.PrintingFree). Each value is an "up to" figure, so
+// the values of one card can add up to more than Free.
 // tygo:export
 type DeckAvailability struct {
-	Owned  int `json:"owned"`
-	Decked int `json:"decked"`
-	Free   int `json:"free"`
+	Owned     int            `json:"owned"`
+	Decked    int            `json:"decked"`
+	Free      int            `json:"free"`
+	Printings map[string]int `json:"printings,omitempty"`
 }
 
 // InventoryCard is an inventory card result enriched with its deck-availability
@@ -515,7 +528,7 @@ func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
 	for i := range enhancedResults {
 		cards[i] = InventoryCard{
 			EnhancedCardResult: enhancedResults[i],
-			Deck:               deckAvailability(availability.OracleAvailabilityFor(enhancedResults[i].OracleID)),
+			Deck:               deckAvailability(availability, enhancedResults[i].OracleID),
 		}
 	}
 

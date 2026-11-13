@@ -102,6 +102,34 @@ describe('AddToDeckModal', () => {
 		});
 	});
 
+	it('pins the printing when asked to by default, and only then', async () => {
+		mockBackend([deck(7, 'Mono Red')]);
+		const onAdded = vi.fn();
+		render(AddToDeckModal, {
+			open: true,
+			cards: [sol],
+			pinByDefault: true,
+			onAdded,
+			onClose: vi.fn()
+		});
+
+		const pin = page.getByRole('checkbox', { name: /Pin this printing/ });
+		await expect.element(pin).toBeChecked();
+		await page.getByRole('button', { name: 'Add to deck' }).click();
+
+		await vi.waitFor(() => expect(onAdded).toHaveBeenCalledWith('Mono Red'));
+		expect(postedItems()?.body.items[0].scryfall_id).toBe('cmm-1');
+	});
+
+	it('leaves the printing unpinned by default', async () => {
+		mockBackend([deck(7, 'Mono Red')]);
+		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+
+		await expect
+			.element(page.getByRole('checkbox', { name: /Pin this printing/ }))
+			.not.toBeChecked();
+	});
+
 	it('adds a quantity of each of several cards outside bulk mode', async () => {
 		mockBackend([deck(7, 'Mono Red')]);
 		const onAdded = vi.fn();

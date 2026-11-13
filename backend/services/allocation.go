@@ -12,7 +12,8 @@ import (
 //
 // It matches deck demand (deck_items in demand zones) against owned inventory
 // and reports, per Oracle ID, how many copies are owned, demanded, free, and
-// whether the Oracle is over-committed across all decks. It is deliberately
+// whether the Oracle is over-committed across all decks. It also reports, per
+// owned printing, how many of its copies are free (PrintingFree). It is deliberately
 // general: the same map feeds both the deck-detail enrichment (this issue) and
 // the inventory "available for deck building" filter (a later issue).
 //
@@ -44,8 +45,9 @@ type OracleAvailability struct {
 }
 
 // AvailabilityMap holds the full per-Oracle availability plus the per-printing
-// quantities needed for the pinned-printing over-commitment check. It is the
-// reusable result both deck-detail enrichment and the inventory filter consume.
+// quantities needed for the pinned-printing over-commitment check and the
+// per-printing free count. It is the reusable result both deck-detail
+// enrichment and the inventory filter consume.
 type AvailabilityMap struct {
 	// Oracle maps oracle_id -> availability.
 	Oracle map[string]OracleAvailability
@@ -53,6 +55,8 @@ type AvailabilityMap struct {
 	ownedByScryfall map[string]int
 	// pinnedByScryfall maps scryfall_id -> demand for that specific printing.
 	pinnedByScryfall map[string]int
+	// printingsByOracle maps oracle_id -> the owned printings of that card.
+	printingsByOracle map[string][]string
 }
 
 // OracleAvailabilityFor returns the availability for an Oracle ID. Oracle IDs
@@ -66,6 +70,30 @@ func (m AvailabilityMap) OracleAvailabilityFor(oracleID string) OracleAvailabili
 	return OracleAvailability{OracleID: oracleID}
 }
 
+// PrintingFree returns how many copies of one printing can go into another deck
+// without leaving any deck short. Decks that pin this printing take its copies
+// first. Decks that accept any printing may take any copy, so the result is
+// also capped by the card's free count. It is an "up to" figure per printing:
+// the figures of one card's printings can add up to more than its free count.
+func (m AvailabilityMap) PrintingFree(oracleID, scryfallID string) int {
+	unpinned := m.ownedByScryfall[scryfallID] - m.pinnedByScryfall[scryfallID]
+	return max(0, min(unpinned, m.OracleAvailabilityFor(oracleID).Free))
+}
+
+// PrintingsFree returns PrintingFree for every owned printing of a card, keyed
+// by scryfall_id, zeros included. It is nil when no printing is owned.
+func (m AvailabilityMap) PrintingsFree(oracleID string) map[string]int {
+	ids := m.printingsByOracle[oracleID]
+	if len(ids) == 0 {
+		return nil
+	}
+	free := make(map[string]int, len(ids))
+	for _, id := range ids {
+		free[id] = m.PrintingFree(oracleID, id)
+	}
+	return free
+}
+
 // ComputeAvailability builds the full availability map from inventory and every
 // deck's demand-zone items, using two GROUP BY aggregations (one over inventory,
 // one over deck_items). Data is small for a personal collection, so no caching
@@ -74,9 +102,10 @@ func (s *AllocationService) ComputeAvailability(ctx context.Context) (Availabili
 	db := s.db.WithContext(ctx)
 
 	result := AvailabilityMap{
-		Oracle:           make(map[string]OracleAvailability),
-		ownedByScryfall:  make(map[string]int),
-		pinnedByScryfall: make(map[string]int),
+		Oracle:            make(map[string]OracleAvailability),
+		ownedByScryfall:   make(map[string]int),
+		pinnedByScryfall:  make(map[string]int),
+		printingsByOracle: make(map[string][]string),
 	}
 
 	// Owned: aggregate inventory quantities by oracle_id and by scryfall_id.
@@ -100,6 +129,9 @@ func (s *AllocationService) ComputeAvailability(ctx context.Context) (Availabili
 		result.Oracle[row.OracleID] = a
 
 		if row.ScryfallID != "" {
+			if _, seen := result.ownedByScryfall[row.ScryfallID]; !seen {
+				result.printingsByOracle[row.OracleID] = append(result.printingsByOracle[row.OracleID], row.ScryfallID)
+			}
 			result.ownedByScryfall[row.ScryfallID] += row.Quantity
 		}
 	}

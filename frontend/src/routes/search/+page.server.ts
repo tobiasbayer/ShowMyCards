@@ -32,7 +32,8 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 
 // PROTOTYPE, throwaway: Collection runs the query (Scryfall syntax) on the backend's
 // local engine over the owned printings in the chosen scope; Catalog loads the first
-// Scryfall page for `q`. Both read deck availability per card from inventory results.
+// Scryfall page for `q`. Both read deck availability (per card, and free copies per
+// owned printing) from inventory results.
 async function loadPrototype(fetch: typeof globalThis.fetch, url: URL): Promise<ProtoData> {
 	const source = url.searchParams.get('source') === 'catalog' ? 'catalog' : 'collection';
 	const query = url.searchParams.get('q')?.trim() ?? '';

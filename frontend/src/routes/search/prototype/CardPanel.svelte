@@ -355,6 +355,7 @@
 				copies: 1
 			}
 		]}
+		pinByDefault={ownedCount(card) > 0}
 		onClose={() => (deckModal = false)}
 		onAdded={onDeckAdded} />
 {/if}

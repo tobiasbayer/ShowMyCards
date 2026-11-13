@@ -25,11 +25,13 @@
 		cards: AddToDeckCard[];
 		/** Bulk mode (inventory selection): offer "all selected copies" vs "1 of each". */
 		bulk?: boolean;
+		/** Start with "Pin this printing" ticked (the caller adds printings the user owns). */
+		pinByDefault?: boolean;
 		onClose: () => void;
 		onAdded?: (deckName: string) => void;
 	}
 
-	let { open, cards, bulk = false, onClose, onAdded }: Props = $props();
+	let { open, cards, bulk = false, pinByDefault = false, onClose, onAdded }: Props = $props();
 
 	const uid = $props.id();
 
@@ -140,7 +142,11 @@
 	}
 
 	$effect(() => {
-		if (open) untrack(loadDecks);
+		if (open)
+			untrack(() => {
+				pin = pinByDefault;
+				loadDecks();
+			});
 	});
 
 	/** Creates the deck being named and selects it. Resolves to it, or undefined when that failed. */

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"backend/models"
@@ -289,8 +290,10 @@ func TestInventoryAvailability(t *testing.T) {
 	if status := getJSON(t, app, "/api/inventory/availability/oracle-print-1", &before); status != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, status)
 	}
-	if before != (DeckAvailability{Owned: 3, Decked: 0, Free: 3}) {
-		t.Errorf("without decks: expected 3 owned, 0 decked, 3 free, got %+v", before)
+	wantBefore := DeckAvailability{Owned: 3, Decked: 0, Free: 3,
+		Printings: map[string]int{"print-1": 2, "print-2": 1}}
+	if !reflect.DeepEqual(before, wantBefore) {
+		t.Errorf("without decks: expected %+v, got %+v", wantBefore, before)
 	}
 
 	deck := models.Deck{Name: "Burn"}
@@ -301,13 +304,16 @@ func TestInventoryAvailability(t *testing.T) {
 
 	var after DeckAvailability
 	getJSON(t, app, "/api/inventory/availability/oracle-print-1", &after)
-	if after != (DeckAvailability{Owned: 3, Decked: 2, Free: 1}) {
-		t.Errorf("with a deck wanting 2: expected 3 owned, 2 decked, 1 free, got %+v", after)
+	// The deck takes any printing, so either printing can still give the one free copy.
+	wantAfter := DeckAvailability{Owned: 3, Decked: 2, Free: 1,
+		Printings: map[string]int{"print-1": 1, "print-2": 1}}
+	if !reflect.DeepEqual(after, wantAfter) {
+		t.Errorf("with a deck wanting 2: expected %+v, got %+v", wantAfter, after)
 	}
 
 	var unknown DeckAvailability
 	getJSON(t, app, "/api/inventory/availability/unknown-oracle", &unknown)
-	if unknown != (DeckAvailability{}) {
+	if !reflect.DeepEqual(unknown, DeckAvailability{}) {
 		t.Errorf("unknown card: expected all zeros, got %+v", unknown)
 	}
 }
