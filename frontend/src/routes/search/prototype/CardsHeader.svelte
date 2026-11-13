@@ -1,12 +1,14 @@
 <!--
 	PROTOTYPE, throwaway. Page chrome for the Cards prototype: one search field
 	(applied on Enter), one scope dropdown (All cards, My collection, a location,
-	Unassigned) and a result count.
+	Unassigned), a language dropdown and a result count.
 -->
 <script lang="ts">
 	import { navigating } from '$app/state';
 	import { untrack } from 'svelte';
 	import { Search } from '@lucide/svelte';
+	import { typedLanguageClause } from '$lib/utils/language-clause';
+	import LanguageMenu from './LanguageMenu.svelte';
 	import type { CardsView, Scope } from './state.svelte';
 
 	let { view }: { view: CardsView } = $props();
@@ -29,6 +31,8 @@
 	}
 
 	const inCollection = $derived(view.scope !== 'catalog');
+	// A language typed in the search wins over the dropdown (on the backend too).
+	const typedClause = $derived(typedLanguageClause(draft));
 
 	// Collection counts copies (as the storage overview does); All cards shows Scryfall's total.
 	const count = $derived(
@@ -75,6 +79,11 @@
 			</optgroup>
 		</select>
 	</label>
+
+	<LanguageMenu
+		value={view.language}
+		{typedClause}
+		onChange={(language) => view.setLanguage(language, draft)} />
 
 	{#if count > 0}
 		<span

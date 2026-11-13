@@ -280,7 +280,9 @@ This section records what the user decided while trying the prototype of the uni
 | `.../prototype/stacks.ts` (+ `stacks.test.ts`) | Pure helpers: `aggregateStacks`, `rowsOfStack`, `pickRowToDecrement` |
 | `.../prototype/MoveMenu.svelte` | The Move icon's DaisyUI dropdown of target locations; the selection bar reuses it with a label, opening upwards |
 | `.../prototype/SelectionBar.svelte` | The floating bar for checked tiles: Select all, Move to, Add to deck, Re-sort, Delete (with its confirmation dialog), Clear |
-| `.../prototype/CardsHeader.svelte` | Search input (applied on Enter), scope dropdown (All cards / My collection / locations / Unassigned), result counter |
+| `.../prototype/CardsHeader.svelte` | Search input (applied on Enter), scope dropdown (All cards / My collection / locations / Unassigned), language dropdown, result counter |
+| `.../prototype/LanguageMenu.svelte` | The language dropdown: DaisyUI dropdown with Any language plus the Scryfall languages |
+| `.../prototype/language.ts` (+ `language.test.ts`) | Language rules: offered languages, each scope's default, which `?lang=` to keep |
 | `.../prototype/CardGrid.svelte` | Infinite-scroll grid |
 | `.../prototype/CardTile.svelte` | Tile: image, caption, deck badge, owned badge, hover "+" |
 | `.../prototype/AddPopover.svelte` | Add popover: finish buttons, destination picker, tally with Undo |
@@ -305,7 +307,7 @@ These override the proposal where they differ.
 - **Clean, minimal UI is a standing preference.** Show only what is needed, and put details behind the panel. Hide empty sections rather than rendering empty states. Minimal does not mean small: cards must stay readable.
 
 ### Page chrome
-- The page has only a search input, a scope dropdown, and a result counter. This replaced the original `Collection | Catalog` switch and the location select; see "Merged scope and local search" below. It has no stats row, grid/table toggle, owned/not-owned post-filter, "Advanced" builder, language selector or per-tile storage dropdown.
+- The page has only a search input, a scope dropdown, a language dropdown and a result counter. This replaced the original `Collection | Catalog` switch and the location select; see "Merged scope and local search" below. It has no stats row, grid/table toggle, owned/not-owned post-filter, "Advanced" builder or per-tile storage dropdown. The language dropdown came back on 2026-11-13; see "Follow-up: language dropdown".
 - **Result counter.** It sits at the right end of the header row and shows quiet text such as "120 cards".
   - **Collection:** the number of physical copies matching the name and location filter. This is the same unit as `card_count` on the storage overview (`GET /api/storage/with-counts`, `SUM(quantity)`). Its tooltip says "N copies in M printings". Verified: a location's count equals its storage-overview count, and the sum over all locations plus unassigned equals the total.
   - **Catalog:** Scryfall's `total_cards` for the query, not just the loaded pages.
@@ -314,7 +316,7 @@ These override the proposal where they differ.
   - The page lands in "My collection" (all owned printings, newest first).
   - The query is kept when the scope changes.
   - The navbar search goes to "All cards".
-  - State lives in the URL (`?source=&q=&location=`; the dropdown maps onto these).
+  - State lives in the URL (`?source=&q=&location=&lang=`; the dropdowns map onto these).
   - Every scope scrolls infinitely.
 - **Collection name filter** matches the English name and the printed (localized) name, like today's search page.
 
@@ -589,6 +591,25 @@ The user owns seven Sol Rings over six printings, with all but one in decks. Sea
 - **Backend:** `AvailabilityMap.PrintingFree` / `PrintingsFree` in `services/allocation.go`; `DeckAvailability.printings` (scryfall_id → free, optional) on `/inventory/search`, `/inventory/cards` and `/inventory/availability/:oracle_id`. The post-write refresh re-reads the last one, so every printing's tile of the card updates.
 - **Follow-up, not done:** a way to pin an existing deck slot to a printing on the deck page. Until then, remove the slot and add it again from the printing's tile.
 
+### Follow-up: language dropdown (2026-11-13)
+
+The user wanted the old search page's language dropdown on the Cards page, defaulting to the language in Settings. Until then All cards silently got the Settings language from the backend, and collection scopes showed every language.
+
+- **Settled (grilling):**
+  - **Every scope** has the dropdown, with the same list: **Any language** plus the 11 Scryfall languages.
+  - **Defaults per scope:** collection scopes show **Any** (the collection still hides nothing by default); All cards shows the **Settings language** (`scryfall_default_language`).
+  - **URL state:** a pick is `?lang=<code|any>`, left out when it equals the scope's default. A fresh visit shows the defaults.
+  - **Scope switch:** a pick carries over (Japanese in All cards, then My collection, shows your Japanese copies). It is dropped when it equals the new scope's default.
+  - **Applies at once:** picking a language reruns the typed query, like a scope change.
+  - **A typed clause wins:** `l:`, `lang:` or `language:` in the search dims and disables the dropdown; its tooltip names the clause. No hint line.
+  - **Control:** a DaisyUI `<details class="dropdown">` (no OS menu), styled like the scope picker when closed, placed right after it.
+  - **Panel "Other printings"** shows printings in the opened card's language, in every scope (`l:<card.language>`), instead of the Settings language.
+  - **Unchanged:** the old page (`?variant=current`) and the Settings page.
+- **How it runs:**
+  - Collection: `+page.server.ts` adds `l:<code>` to the query sent to `/api/inventory/search` unless the query has a clause or the pick is Any.
+  - All cards: `lang=<code>` goes to `/api/search` only when picked, so without a pick the backend still applies the setting. Any sends `lang=any` (Scryfall `l:any`). "Load more" sends the same `lang`.
+- **Shared helper:** `frontend/src/lib/utils/language-clause.ts` (`hasLanguageClause`, `typedLanguageClause`, `withLanguage`), also used by the card list parser. The backend's `languageClauseRegExp` now matches `language:` too, the local engine's alias.
+
 ## Local search engine (2026-11-10)
 
 The user asked to implement the local Scryfall syntax and to wire it into the prototype only (not today's inventory pages). The engine is its own package so it can move to `main` as "Suggested order" step 2.
@@ -707,6 +728,7 @@ Other Scryfall errors in All cards show "Scryfall couldn't read this search" (or
 
 - **Sandbox limits:** the sandbox blocks binding local ports (Go `httptest` servers, Vitest browser tests), the golangci-lint cache, localhost connections from scripts, and `go run github.com/gzuidhof/tygo@latest` (TLS through the proxy). Those commands were run outside the sandbox. `sandbox.network.allowLocalBinding: true` fixes the port-binding part.
 - **Testing dropdowns:** check them with real clicks. Setting a `<select>` value and dispatching `change` from a script skips opening the menu, and with it the focus and blur that broke the first Move menu. Browser automation also cannot click inside an OS-native select menu; that is one more reason to prefer DOM-based DaisyUI dropdowns.
+- **DaisyUI `<details>` dropdowns: no `tabindex` on the `<summary>`.** DaisyUI's `.dropdown:focus-within > [tabindex]:first-child { pointer-events: none }` switches off its pointer events as soon as the click focuses it, so the click never toggles the menu. A summary is focusable without one. This broke the first language dropdown (2026-11-13).
 - **Testing writes safely:** copy the database with `sqlite3 backend/data/database.db ".backup <scratch>/e2e.db"` (about 10 s for 3.8 GB). Then run a second backend with `DATABASE_PATH=<scratch>/e2e.db DATA_DIR=<scratch>/e2e-data PORT=3100 go run .` and a frontend against it with `PUBLIC_BACKEND_URL=http://localhost:3100 bun run dev --port 5174`. Never test writes against the user's dev database.
 - **Baseline on `main`, so you don't chase it:**
   - svelte-check: 16 errors and 1 warning (missing `node` types).

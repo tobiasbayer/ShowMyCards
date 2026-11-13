@@ -22,6 +22,8 @@
  * can be re-zoned in the deck UI). Inventory import ignores zones.
  */
 
+import { withLanguage } from './language-clause';
+
 export type TreatmentPreference = 'nonfoil' | 'foil' | 'etched';
 
 /** Where a parsed line belongs within a deck. Assignable to the DeckZone model type. */
@@ -81,10 +83,6 @@ const LEADING_PATTERN = /^(\d+)?\s*(!!?)?\s*(.+)$/;
 // LAST "(XXX)" group (e.g. "Erase (Not the One) (WTH) 20").
 const PINNED_PATTERN = /^(.+)\s+\(([0-9A-Za-z]+)\)\s+([0-9A-Za-z★-]+)(?:\s+\*([FE])\*)?$/;
 
-// Existing Scryfall language clause (l: or lang:), mirroring the backend's
-// languageClauseRegExp in backend/api/search.go so we never double-append.
-const LANGUAGE_CLAUSE_PATTERN = /(^|\s)[-!]?(l|lang):/i;
-
 // Section headers → zone, plus "about" for the metadata block MTGA exports emit.
 const ZONE_HEADERS: Record<string, ImportZone | 'ignore'> = {
 	about: 'ignore',
@@ -138,14 +136,6 @@ function classifyLine(trimmed: string): LineKind {
 
 	// Otherwise treat it as a name-only card with an implicit quantity of 1.
 	return { kind: 'card' };
-}
-
-/** Append the language clause to a query unless one is already present. */
-function withLanguage(query: string, language?: string): string {
-	if (language && !LANGUAGE_CLAUSE_PATTERN.test(query)) {
-		return `${query} l:${language}`;
-	}
-	return query;
 }
 
 /**

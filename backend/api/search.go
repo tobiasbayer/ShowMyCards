@@ -16,7 +16,10 @@ import (
 	"gorm.io/gorm"
 )
 
-var languageClauseRegExp = regexp.MustCompile(`(?i)(^|\s)[-!]?(l|lang):`)
+// languageClauseRegExp matches a typed language clause. `language:` is the
+// local engine's alias (cardquery); the frontend mirrors this pattern in
+// frontend/src/lib/utils/language-clause.ts.
+var languageClauseRegExp = regexp.MustCompile(`(?i)(^|\s)[-!]?(l|lang|language):`)
 
 // SearchHandler handles card search endpoints
 type SearchHandler struct {

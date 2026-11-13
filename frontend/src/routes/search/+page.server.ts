@@ -14,32 +14,37 @@ import {
 } from '$lib/server/inventory-actions';
 import { loadStorageLocations } from '$lib/server/storage';
 import { fetchAllInventoryCards } from '$lib/server/inventory-cards';
+import { withLanguage } from '$lib/utils/language-clause';
 import type { Actions, PageServerLoad } from './$types';
 import { fail } from '@sveltejs/kit';
 import type { ProtoData } from './prototype/state.svelte';
+import { ANY_LANGUAGE, parseLanguage } from './prototype/language';
 
 // Load storage locations for the dropdown and the saved default language
 export const load: PageServerLoad = async ({ fetch, url }) => {
-	const [storageLocations, defaultLanguage] = await Promise.all([
-		loadStorageLocations(fetch),
-		loadDefaultLanguage(fetch)
-	]);
 	// PROTOTYPE branch: /search is the Cards page; `?variant=current` is today's search page.
-	const proto =
-		url.searchParams.get('variant') === 'current' ? null : await loadPrototype(fetch, url);
+	const [storageLocations, defaultLanguage, proto] = await Promise.all([
+		loadStorageLocations(fetch),
+		loadDefaultLanguage(fetch),
+		url.searchParams.get('variant') === 'current' ? null : loadPrototype(fetch, url)
+	]);
 	return { storageLocations, defaultLanguage, proto };
 };
 
 // PROTOTYPE, throwaway: Collection runs the query (Scryfall syntax) on the backend's
 // local engine over the owned printings in the chosen scope; Catalog loads the first
 // Scryfall page for `q`. Both read deck availability (per card, and free copies per
-// owned printing) from inventory results.
+// owned printing) from inventory results. A picked language (`?lang=`) is added to
+// the query unless the query names one; without a pick the collection shows every
+// language and Scryfall gets the Settings language from the backend.
 async function loadPrototype(fetch: typeof globalThis.fetch, url: URL): Promise<ProtoData> {
 	const source = url.searchParams.get('source') === 'catalog' ? 'catalog' : 'collection';
 	const query = url.searchParams.get('q')?.trim() ?? '';
+	const language = parseLanguage(url.searchParams.get('lang'));
 	const data: ProtoData = {
 		source,
 		query,
+		language,
 		collection: [],
 		catalog: { cards: [], hasMore: false, total: 0 },
 		availability: {},
@@ -49,7 +54,8 @@ async function loadPrototype(fetch: typeof globalThis.fetch, url: URL): Promise<
 	try {
 		if (source === 'collection') {
 			const params = new URLSearchParams();
-			if (query) params.set('q', query);
+			const q = withLanguage(query, language === ANY_LANGUAGE ? '' : (language ?? ''));
+			if (q) params.set('q', q);
 			const location = url.searchParams.get('location');
 			if (location === 'unassigned') params.set('storage_location_id', 'null');
 			else if (location && /^\d+$/.test(location)) params.set('storage_location_id', location);
@@ -69,7 +75,9 @@ async function loadPrototype(fetch: typeof globalThis.fetch, url: URL): Promise<
 		// Catalog only needs the collection for the deck badge, so a failure there just hides it.
 		const collection = fetchAllInventoryCards(fetch).catch(() => []);
 		if (query) {
-			const response = await fetch(`${BACKEND_URL}/api/search?q=${encodeURIComponent(query)}`);
+			const params = new URLSearchParams({ q: query });
+			if (language) params.set('lang', language);
+			const response = await fetch(`${BACKEND_URL}/api/search?${params}`);
 			if (response.ok) {
 				const result: SearchResponse = await response.json();
 				data.catalog = {

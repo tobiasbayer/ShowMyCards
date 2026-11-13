@@ -349,6 +349,8 @@ func TestHasLanguageClause(t *testing.T) {
 	}{
 		{"short form", "l:de", true},
 		{"long form", "lang:german", true},
+		{"engine alias", "language:ja", true},
+		{"negated alias", "-language:en", true},
 		{"uppercase", "L:EN", true},
 		{"mixed case lang", "LaNg:fr", true},
 		{"negated short", "-l:en", true},

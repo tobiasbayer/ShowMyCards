@@ -188,7 +188,10 @@
 
 {#if data.proto}
 	{#key data.proto}
-		<VariantPush proto={data.proto} locations={data.storageLocations} />
+		<VariantPush
+			proto={data.proto}
+			locations={data.storageLocations}
+			settingsLanguage={data.defaultLanguage} />
 	{/key}
 {:else}
 	<div class="container mx-auto px-4 py-8 max-w-7xl">

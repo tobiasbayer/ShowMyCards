@@ -12,9 +12,13 @@
 	import SelectionBar from './SelectionBar.svelte';
 	import { CardsView, ui, type ProtoData } from './state.svelte';
 
-	let { proto, locations }: { proto: ProtoData; locations: StorageLocation[] } = $props();
+	let {
+		proto,
+		locations,
+		settingsLanguage
+	}: { proto: ProtoData; locations: StorageLocation[]; settingsLanguage: string } = $props();
 
-	const view = untrack(() => new CardsView(proto, locations));
+	const view = untrack(() => new CardsView(proto, locations, settingsLanguage));
 
 	// Esc closes an open popover, menu or dialog first (they count themselves in
 	// ui.openPopovers), then clears the selection, then closes the panel.

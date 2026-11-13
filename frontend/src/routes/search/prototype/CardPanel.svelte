@@ -7,7 +7,8 @@
 	import type { EnhancedCardResult as Card } from '$lib';
 	import { manaSymbolClasses } from '$lib/utils/mana';
 
-	// Other printings cost one Scryfall request each (1 RPS); cache per oracle for the session.
+	// Other printings cost one Scryfall request each (1 RPS); cache per oracle and
+	// language for the session.
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- module-level cache, not reactive state
 	const printingsCache = new Map<string, Promise<Card[]>>();
 
@@ -83,15 +84,22 @@
 			.catch(() => []);
 	}
 
-	function loadPrintings(oracleId: string): Promise<EnhancedCardResult[]> {
-		let pending = printingsCache.get(oracleId);
+	/**
+	 * Other printings in the opened card's language, whatever the dropdown shows. The
+	 * typed `l:` keeps the backend from adding the Settings language.
+	 */
+	function loadPrintings(oracleId: string, language: string): Promise<EnhancedCardResult[]> {
+		const key = `${oracleId}|${language}`;
+		let pending = printingsCache.get(key);
 		if (!pending) {
-			const q = encodeURIComponent(`oracleid:${oracleId} unique:prints`);
+			const q = encodeURIComponent(
+				`oracleid:${oracleId} unique:prints${language ? ` l:${language}` : ''}`
+			);
 			pending = fetch(`/api/search?q=${q}`)
 				.then((r) => (r.ok ? r.json() : { data: [] }))
 				.then((d: { data?: EnhancedCardResult[] }) => d.data ?? [])
 				.catch(() => []);
-			printingsCache.set(oracleId, pending);
+			printingsCache.set(key, pending);
 		}
 		return pending;
 	}
@@ -99,6 +107,7 @@
 	$effect(() => {
 		const id = card.id;
 		const oracleId = card.oracle_id;
+		const language = card.language;
 		let cancelled = false;
 		decks = null;
 		printings = null;
@@ -110,7 +119,7 @@
 		});
 
 		if (oracleId) {
-			loadPrintings(oracleId).then((all) => {
+			loadPrintings(oracleId, language).then((all) => {
 				if (!cancelled) printings = all.filter((p) => p.id !== id);
 			});
 		} else {

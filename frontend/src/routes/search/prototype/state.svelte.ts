@@ -27,6 +27,7 @@ import {
 	type LocationFilter,
 	type Stack
 } from './stacks';
+import { defaultLanguage, languageParam } from './language';
 
 export type { LocationFilter, Stack } from './stacks';
 
@@ -43,6 +44,8 @@ export type Destination = number | 'unassigned' | 'auto';
 export interface ProtoData {
 	source: Source;
 	query: string;
+	/** The language picked in the dropdown (`?lang=`, a code or `any`); null = the scope's default. */
+	language: string | null;
 	collection: EnhancedCardResult[];
 	/** `total` is Scryfall's match count for the query, not just the loaded pages. */
 	catalog: { cards: EnhancedCardResult[]; hasMore: boolean; total: number };
@@ -413,11 +416,15 @@ function searchPath(params: URLSearchParams): string {
 	return `/search${query ? `?${query}` : ''}`;
 }
 
-/** Per-variant view state: source, query, location filter, selection, paging. */
+/** Per-variant view state: source, query, location filter, language, selection, paging. */
 export class CardsView {
 	source = $state<Source>('collection');
 	query = $state('');
 	location = $state<LocationFilter>('all');
+	/** The language picked in the dropdown; null shows the scope's default. */
+	readonly pickedLanguage: string | null;
+	/** The `scryfall_default_language` setting: what All cards shows without a pick. */
+	readonly settingsLanguage: string;
 	selected = $state<EnhancedCardResult | null>(null);
 
 	catalog = $state.raw<EnhancedCardResult[]>([]);
@@ -433,9 +440,11 @@ export class CardsView {
 	readonly locations: StorageLocation[];
 	readonly availability: Record<string, DeckAvailability>;
 
-	constructor(proto: ProtoData, locations: StorageLocation[]) {
+	constructor(proto: ProtoData, locations: StorageLocation[], settingsLanguage: string) {
 		this.source = proto.source;
 		this.query = proto.query;
+		this.pickedLanguage = proto.language;
+		this.settingsLanguage = settingsLanguage;
 		this.collection = proto.collection;
 		this.catalog = proto.catalog.cards;
 		this.hasMore = proto.catalog.hasMore;
@@ -449,6 +458,11 @@ export class CardsView {
 		const loc = page.url.searchParams.get('location');
 		if (loc === 'unassigned') this.location = 'unassigned';
 		else if (loc && /^\d+$/.test(loc)) this.location = Number(loc);
+	}
+
+	/** The language the results are in: the pick, else the scope's default. */
+	get language(): string {
+		return this.pickedLanguage ?? defaultLanguage(this.source, this.settingsLanguage);
 	}
 
 	/**
@@ -544,7 +558,10 @@ export class CardsView {
 		this.loadingMore = true;
 		try {
 			const next = this.catalogPage + 1;
-			const res = await fetch(`/api/search?q=${encodeURIComponent(this.query)}&page=${next}`);
+			const lang = this.pickedLanguage ? `&lang=${encodeURIComponent(this.pickedLanguage)}` : '';
+			const res = await fetch(
+				`/api/search?q=${encodeURIComponent(this.query)}&page=${next}${lang}`
+			);
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const data = (await res.json()) as SearchResponse;
 			this.catalog = [...this.catalog, ...(data.data ?? [])];
@@ -581,14 +598,26 @@ export class CardsView {
 		else this.navigate('collection', scope);
 	}
 
-	/** Every search and scope change goes through the server load. */
-	navigate(source: Source, location?: LocationFilter) {
+	/** Applies a language from the dropdown and reruns `query` in the current scope. */
+	setLanguage(language: string, query: string) {
+		this.query = query;
+		this.navigate(this.source, undefined, language);
+	}
+
+	/**
+	 * Every search, scope and language change goes through the server load. A picked
+	 * language carries over to another scope unless it is that scope's default.
+	 */
+	navigate(source: Source, location?: LocationFilter, language = this.pickedLanguage) {
 		const params = this.#params();
 		params.set('source', source);
 		if (location === 'all') params.delete('location');
 		else if (location !== undefined) params.set('location', String(location));
 		if (this.query) params.set('q', this.query);
 		else params.delete('q');
+		const lang = languageParam(language, source, this.settingsLanguage);
+		if (lang) params.set('lang', lang);
+		else params.delete('lang');
 		goto(resolve(searchPath(params) as '/search'), { keepFocus: true, noScroll: true });
 	}
 }
