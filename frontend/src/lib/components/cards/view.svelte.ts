@@ -2,13 +2,13 @@
 // built from the server load, with the scope, language and sort the URL holds,
 // the checked tiles, the open card and paging.
 
-import { browser } from '$app/environment';
+import { browser } from '$app/env';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
 import { SvelteSet } from 'svelte/reactivity';
-import { searchApi, type InventoryCard, type StorageLocation } from '$lib';
-import type { Currency } from '$lib/stores/currency.svelte';
+import { searchApi, type InventoryCard, type StorageLocation } from '#lib';
+import type { Currency } from '#lib/stores/currency.svelte.ts';
 import { catalogSearch } from './catalog';
 import { errorMessage } from './format';
 import { defaultLanguage, languageParam } from './language';
@@ -281,6 +281,6 @@ export class CardsView {
 		const sortValue = sortParam(sort);
 		if (sortValue) params.set('sort', sortValue);
 		else params.delete('sort');
-		goto(resolve(`/cards?${params}`), { keepFocus: true, noScroll: true });
+		goto(resolve(`/cards?${params}`), { reset: false });
 	}
 }

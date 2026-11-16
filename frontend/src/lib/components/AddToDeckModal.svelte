@@ -7,14 +7,14 @@
 		type DeckAvailability,
 		type DeckCardUsage,
 		type DeckZone
-	} from '$lib';
+	} from '#lib';
 	import {
 		buildDeckItems,
 		sharedCopyAddedMessage,
 		sharedCopyMessage,
 		sharedCopyNotice,
 		type AddToDeckCard
-	} from '$lib/utils/deck-add';
+	} from '#lib/utils/deck-add.ts';
 	import { Info, LayersPlus } from '@lucide/svelte';
 	import { DeckChoice } from './deck-choice.svelte';
 	import DeckField from './DeckField.svelte';

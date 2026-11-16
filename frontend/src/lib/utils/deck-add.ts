@@ -1,4 +1,4 @@
-import type { CreateDeckItemRequest, DeckAvailability, DeckCardUsage, DeckZone } from '$lib';
+import type { CreateDeckItemRequest, DeckAvailability, DeckCardUsage, DeckZone } from '#lib';
 
 /** A card offered to the "Add to deck" dialog. */
 export interface AddToDeckCard {

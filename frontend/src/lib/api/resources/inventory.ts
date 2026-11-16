@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { DeckAvailability, Inventory, StorageLocation } from '$lib';
+import type { DeckAvailability, Inventory, StorageLocation } from '#lib';
 import type {
 	BatchMoveRequest,
 	CreateInventoryRequest,
@@ -10,7 +10,7 @@ import type {
 	ResortResponse,
 	SplitMoveRequest,
 	SplitMoveResponse
-} from '$lib/types/api';
+} from '#lib/types/api.ts';
 
 /**
  * Where the sorting rules would put a new copy (the backend's AutoLocationResponse,
@@ -57,7 +57,7 @@ export interface PaginatedInventoryResponse {
  *
  * @example
  * ```ts
- * import { inventoryApi } from '$lib/api';
+ * import { inventoryApi } from '#lib/api/index.ts';
  *
  * // List all inventory items
  * const items = await inventoryApi.list();

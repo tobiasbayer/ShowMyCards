@@ -1,5 +1,5 @@
 <script lang="ts">
-	import CardsPage from '$lib/components/cards/CardsPage.svelte';
+	import CardsPage from '#lib/components/cards/CardsPage.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

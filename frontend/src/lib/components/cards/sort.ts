@@ -1,7 +1,7 @@
 // The Cards page's sort menu: the `?sort=` value and the `order:`
 // clause it adds to the search, like the language menu and `l:`.
 
-import type { Currency } from '$lib/stores/currency.svelte';
+import type { Currency } from '#lib/stores/currency.svelte.ts';
 
 /** A picked price sort. The currency is fixed when picked, so the URL says it. */
 export interface PriceSort {

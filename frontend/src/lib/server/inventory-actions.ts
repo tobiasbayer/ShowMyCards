@@ -1,7 +1,7 @@
 /**
  * Server-side form action handler for adding inventory, used by the import page.
  */
-import { BACKEND_URL } from '$lib';
+import { BACKEND_URL } from '#lib';
 import { fail } from '@sveltejs/kit';
 
 /**

@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { notifications } from '$lib';
+import { notifications } from '#lib';
 import { live } from './live.svelte';
 import { card, fakeBackend, row, type FakeBackend } from './test-fixtures';
 import { addCopy, deleteCopies, moveStack, removeCopy, resortCopies } from './writes';
 
-// The $lib barrel pulls in components that use more of $app/navigation than goto.
+// The #lib barrel pulls in components that use more of $app/navigation than goto.
 vi.mock('$app/navigation', () => ({
 	goto: vi.fn(),
 	invalidate: vi.fn(),
-	invalidateAll: vi.fn(),
+	refreshAll: vi.fn(),
 	afterNavigate: vi.fn(),
 	beforeNavigate: vi.fn(),
 	onNavigate: vi.fn(),

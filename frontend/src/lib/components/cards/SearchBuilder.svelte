@@ -6,8 +6,8 @@
 	leaves it out, since Scryfall rejects those keywords.
 -->
 <script module lang="ts">
-	import type { Set as CardSet } from '$lib/types/models';
-	import type { ColorMode, CompareOp, Finish } from '$lib/utils/search-builder';
+	import type { Set as CardSet } from '#lib/types/models.ts';
+	import type { ColorMode, CompareOp, Finish } from '#lib/utils/search-builder.ts';
 
 	type NumericId = 'mv' | 'pow' | 'tou' | 'loy' | 'qty' | 'free';
 
@@ -37,8 +37,8 @@
 
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import SetCombobox from '$lib/components/SetCombobox.svelte';
-	import { buildSearchQuery } from '$lib/utils/search-builder';
+	import SetCombobox from '#lib/components/SetCombobox.svelte';
+	import { buildSearchQuery } from '#lib/utils/search-builder.ts';
 	import { ui } from './live.svelte';
 	import type { CardsView } from './view.svelte';
 

@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { Lozenge, currency } from '$lib';
-	import type { CardPrices } from '$lib';
-	import { getTreatmentPrice } from '$lib/utils/card-prices';
+	import { Lozenge, currency } from '#lib';
+	import type { CardPrices } from '#lib';
+	import { getTreatmentPrice } from '#lib/utils/card-prices.ts';
 
 	interface Props {
 		treatment: string;

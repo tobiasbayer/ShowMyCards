@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { ScryfallCard } from '$lib';
-	import { notifications, getActionError } from '$lib';
-	import { invalidateAll } from '$app/navigation';
+	import type { ScryfallCard } from '#lib';
+	import { notifications, getActionError } from '#lib';
+	import { refreshAll } from '$app/navigation';
 	import { deserialize } from '$app/forms';
 	import { Plus } from '@lucide/svelte';
 
@@ -42,7 +42,7 @@
 			const response = await fetch('?/addItems', { method: 'POST', body: formData });
 			const result = deserialize(await response.text());
 			if (result.type === 'success') {
-				await invalidateAll();
+				await refreshAll();
 				const zoneLabel = ZONES.find((z) => z.value === zone)?.label ?? zone;
 				notifications.success(`Added ${card.name} to ${zoneLabel}`);
 			} else if (result.type === 'failure') {

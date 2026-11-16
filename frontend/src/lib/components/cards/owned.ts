@@ -1,7 +1,7 @@
 // What the Cards page shows about a card's copies: its stacks (re-read after a
 // write, else as loaded), the copies in a scope, and where new copies would go.
 
-import type { EnhancedCardResult, Inventory, StorageLocation } from '$lib';
+import type { EnhancedCardResult, Inventory, StorageLocation } from '#lib';
 import { live } from './live.svelte';
 import {
 	aggregateStacks,

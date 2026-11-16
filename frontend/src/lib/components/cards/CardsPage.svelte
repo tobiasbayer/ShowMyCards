@@ -6,7 +6,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { fly } from 'svelte/transition';
-	import type { StorageLocation } from '$lib';
+	import type { StorageLocation } from '#lib';
 	import CardGrid from './CardGrid.svelte';
 	import CardPanel from './CardPanel.svelte';
 	import CardsHeader from './CardsHeader.svelte';

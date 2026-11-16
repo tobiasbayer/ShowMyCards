@@ -9,8 +9,8 @@
 	can't hover, "+" and the checkmark are always shown.
 -->
 <script lang="ts">
-	import { getDisplayName, type InventoryCard } from '$lib';
-	import { highestOwnedPrice, printingPrice } from '$lib/utils/card-prices';
+	import { getDisplayName, type InventoryCard } from '#lib';
+	import { highestOwnedPrice, printingPrice } from '#lib/utils/card-prices.ts';
 	import { plural } from './format';
 	import { Check, Layers, Plus } from '@lucide/svelte';
 	import AddPopover from './AddPopover.svelte';

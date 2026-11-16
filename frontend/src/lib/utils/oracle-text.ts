@@ -34,11 +34,10 @@ export function parseOracleText(text: string | undefined): OraclePart[][][] {
 					return chunk
 						.split(/(\{[^}]+\})/)
 						.filter(Boolean)
-						.map(
-							(piece): OraclePart =>
-								/^\{[^}]+\}$/.test(piece)
-									? { kind: 'symbol', cls: symbolClass(piece), label: piece }
-									: { kind: 'text', text: piece, reminder }
+						.map((piece): OraclePart =>
+							/^\{[^}]+\}$/.test(piece)
+								? { kind: 'symbol', cls: symbolClass(piece), label: piece }
+								: { kind: 'text', text: piece, reminder }
 						);
 				})
 		)

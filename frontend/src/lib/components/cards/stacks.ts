@@ -2,7 +2,7 @@
 // pick the rows a write should touch. Kept free of Svelte and network code so
 // the choices that change real data are unit-tested (stacks.test.ts).
 
-import type { Inventory } from '$lib';
+import type { Inventory } from '#lib';
 
 /** Copies of one printing, in one finish, at one location (null = unassigned). */
 export interface Stack {

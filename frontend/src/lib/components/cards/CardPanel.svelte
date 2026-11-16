@@ -6,9 +6,9 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { untrack } from 'svelte';
-	import { currency, decksApi, getDisplayName, type DeckCardUsage, type InventoryCard } from '$lib';
-	import AddToDeckModal from '$lib/components/AddToDeckModal.svelte';
-	import { getTreatmentPrice } from '$lib/utils/card-prices';
+	import { currency, decksApi, getDisplayName, type DeckCardUsage, type InventoryCard } from '#lib';
+	import AddToDeckModal from '#lib/components/AddToDeckModal.svelte';
+	import { getTreatmentPrice } from '#lib/utils/card-prices.ts';
 	import { Minus, Plus, X } from '@lucide/svelte';
 	import AddPopover from './AddPopover.svelte';
 	import MoveMenu from './MoveMenu.svelte';
@@ -18,7 +18,7 @@
 	import type { CardsView } from './view.svelte';
 	import { addCopy, moveStack, refreshCard, removeCopy } from './writes';
 	import { loadPrintings } from './printings';
-	import { parseOracleText } from '$lib/utils/oracle-text';
+	import { parseOracleText } from '#lib/utils/oracle-text.ts';
 
 	let { card, view }: { card: InventoryCard; view: CardsView } = $props();
 

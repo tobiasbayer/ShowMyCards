@@ -1,7 +1,7 @@
 // Server data the Cards page re-read after its own writes, and the count of
 // open menus and dialogs. Shared by the view, the write actions and the components.
 
-import type { DeckAvailability, Inventory, InventoryCard } from '$lib';
+import type { DeckAvailability, Inventory, InventoryCard } from '#lib';
 
 /**
  * Server data re-read after this session's writes. It overrides the page's

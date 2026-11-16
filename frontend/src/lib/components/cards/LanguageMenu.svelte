@@ -4,7 +4,7 @@
 -->
 <script lang="ts">
 	import { Check } from '@lucide/svelte';
-	import Dropdown from '$lib/components/Dropdown.svelte';
+	import Dropdown from '#lib/components/Dropdown.svelte';
 	import { ANY_LANGUAGE, LANGUAGE_OPTIONS, languageName } from './language';
 	import { countOpen } from './live.svelte';
 

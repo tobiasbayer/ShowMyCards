@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DeckAvailability, DeckCardUsage } from '$lib';
+import type { DeckAvailability, DeckCardUsage } from '#lib';
 import {
 	buildDeckItems,
 	sharedCopyAddedMessage,

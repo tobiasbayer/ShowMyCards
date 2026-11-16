@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { currency, type Currency } from '$lib';
+	import { currency, type Currency } from '#lib';
 	import SettingRow from './SettingRow.svelte';
 
 	// Currency setting (client-only, uses currency store)

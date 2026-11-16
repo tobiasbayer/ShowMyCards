@@ -2,6 +2,8 @@
 
 > **Where this file lives:** `docs/cards-convergence-proposal.md`, versioned on the `prototype/cards-page` branch. It started as an untracked note in `.scratch/` and moved on 2026-11-10.
 >
+> **Status (2026-11-16):** `main`, with upstream's SvelteKit 3 migration, is merged into this branch. See [Merged main (2026-11-16)](#merged-main-2026-11-16) at the end for what changed in this branch's code (`#lib`, `refreshAll`, `goto` options).
+>
 > **Status (2026-11-13):** The Cards page is promoted to production on this branch: it lives at `/cards`, the old search page and its orphans are gone, and the prototype code was reworked to the review standards. See [Promotion (2026-11-13)](#promotion-2026-11-13) at the end, and "Where the work is" for the current files. The dated follow-up sections in between are history: their file paths are the prototype's (`routes/search/prototype/…`).
 >
 > **Status (2026-11-10):** The design below was validated with a throwaway UI prototype. The user's verdicts, the decisions they settled, and the facts found along the way are in [Prototype results](#prototype-results-2026-11-10) at the end of this file. Where they differ from the proposal, the prototype results win: they are the user's later decisions.
@@ -785,12 +787,9 @@ Other Scryfall errors in All cards show "Scryfall couldn't read this search" (or
 - **Testing dropdowns:** check them with real clicks. Setting a `<select>` value and dispatching `change` from a script skips opening the menu, and with it the focus and blur that broke the first Move menu. Browser automation also cannot click inside an OS-native select menu; that is one more reason to prefer DOM-based DaisyUI dropdowns.
 - **DaisyUI `<details>` dropdowns: no `tabindex` on the `<summary>`.** DaisyUI's `.dropdown:focus-within > [tabindex]:first-child { pointer-events: none }` switches off its pointer events as soon as the click focuses it, so the click never toggles the menu. A summary is focusable without one. This broke the first language dropdown (2026-11-13).
 - **Testing writes safely:** copy the database with `sqlite3 backend/data/database.db ".backup <scratch>/e2e.db"` (about 10 s for 3.8 GB). Then run a second backend with `DATABASE_PATH=<scratch>/e2e.db DATA_DIR=<scratch>/e2e-data PORT=3100 go run .` and a frontend against it with `PUBLIC_BACKEND_URL=http://localhost:3100 bun run dev --port 5174`. Never test writes against the user's dev database.
-- **Baseline on this branch (2026-11-13):** svelte-check 0 errors and 1 warning (missing `node` types); eslint and prettier clean; every Vitest test passes; golangci-lint 58 findings repo-wide (`errcheck`/`staticcheck`, none in the Cards page's files).
-- **Baseline on `main`, so you don't chase it:**
-  - svelte-check: 16 errors and 1 warning (missing `node` types).
-  - Vitest: 6 failing `InventoryBrowser.svelte.spec.ts` tests.
-  - golangci-lint on `./api/...`: 12 `errcheck` findings, all in test files.
-  - gofmt: several files are unformatted (`api/data.go`, `api/storage.go`, some tests).
+- **Baseline on this branch (2026-11-16, after merging `main`):** svelte-check 0 errors and 0 warnings; eslint and prettier clean; every Vitest test passes; golangci-lint 58 findings repo-wide (`errcheck`/`staticcheck`, none in the Cards page's files); gofmt flags five older files (`api/storage.go` and four tests).
+- **Baseline on `main` (2026-11-16):** the same. Its earlier svelte-check errors and failing `InventoryBrowser` tests were fixed when it merged upstream.
+- **Bun 1.4.4 or newer** is needed: `frontend/bun.lock` is lockfile v3 since upstream #186.
 
 # Promotion (2026-11-13)
 
@@ -804,7 +803,7 @@ The user asked to promote the Cards page to production on this branch: delete th
 | 2 | "Did you mean" suggestions are dropped. |
 | 3 | Orphans go in **frontend and backend** (endpoints, handlers, client methods, tests, generated types). |
 | 4 | Production-grade means: prototype names and comments gone; a review-standards pass with every MUST FIX and SHOULD FIX fixed; test gaps filled; no native selects. |
-| 5 | Components, state and helpers live in `$lib/components/cards/`. |
+| 5 | Components, state and helpers live in `#lib/components/cards/` (`$lib` before SvelteKit 3). |
 | 6 | Small screens: the panel sits beside the grid from `md`, covers the page below it; on touch screens the tile's "+" and checkmark are always shown. |
 | 7 | URL parameters are unchanged (`source`, `location`, `q`, `lang`, `sort`). |
 | 8 | Logical commits: additive backend first, then the frontend stops using things, then backend removals. |
@@ -833,3 +832,21 @@ The user asked to promote the Cards page to production on this branch: delete th
 - Backend: `go test ./...` passes; `go vet` clean; golangci-lint at its baseline. Frontend: svelte-check 0 errors, eslint and prettier clean, 371 server-side and 80 browser tests pass.
 - In Chrome against a copy of the real database (backend on 3100, frontend on 5174), with real clicks: the scope dropdown and a location scope; the Esc order deck menu → dialog → panel; navbar search into All cards; per-printing deck badges from the search results (three owned Sol Ring printings), with no call to a removed endpoint; "load more" up to all 504 `t:goblin` results; add, Undo and "−" saved to the database; at 606px the panel covers the page with no sideways scroll, at 820px it sits beside a one-column grid; `/search` and `/inventory/recent` are 404s; Settings shows only the currency; the sidebar, dashboard, inventory and storage links open the right scopes; the light theme; no console errors.
 - Not verified: touch devices (the always-visible controls rely on `pointer: coarse`, which desktop Chrome doesn't emulate here).
+
+# Merged main (2026-11-16)
+
+`main` brought upstream's dependency catch-up (#186: SvelteKit 3, Vite 8, TypeScript 6, prettier 3.10, Go 1.26.11, fiber 3.7), #179 (Scryfall image formats), and decks in exports and backups (`5d155f4`).
+
+- **Conflicts:** files this branch had deleted (old search, inventory sub-pages, `CardResultCard`, the stores, audio …) stay deleted; main had only migrated their imports. Everywhere else the branch side won and took main's syntax.
+- **SvelteKit 3 in this branch's code:**
+  - `$lib` is now `#lib`, and subpath imports name the file's extension (`#lib/utils/deck-add.ts`, `#lib/stores/currency.svelte.ts`). Relative imports stay without one.
+  - `invalidateAll` is now `refreshAll`, and `$app/environment` is now `$app/env`. Test mocks of `$app/navigation` must export `refreshAll`, because the `#lib` barrel imports it.
+  - `goto` no longer has `keepFocus`/`noScroll`; passing them throws in dev. `CardsView.navigate()` passes `reset: false` instead.
+  - `resolve()` takes a concrete pathname without the leading slash (`` resolve(`cards/${id}`) ``). Route IDs and query-string forms keep it (`` resolve(`/cards?${params}`) ``).
+- **Backend:** `golang.org/x/text` stays a direct dependency (`cardquery/fold.go`), at main's v0.44.0.
+
+## Verified
+
+- Frontend: svelte-check 0 errors and 0 warnings; eslint and prettier clean; 451 Vitest tests pass (34 files); `bun run build` succeeds.
+- Backend: `go vet` clean; `go test ./...` passes; golangci-lint at its baseline (58). `make types` reproduces the merged generated types exactly.
+- Not verified: the page in a browser after the merge.

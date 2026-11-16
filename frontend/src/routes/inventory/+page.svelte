@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
-	import { afterNavigate, invalidateAll } from '$app/navigation';
+	import { browser } from '$app/env';
+	import { afterNavigate, refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { PageData } from './$types';
-	import { PageHeader, Notification, EmptyState, ResortModal } from '$lib';
+	import { PageHeader, Notification, EmptyState, ResortModal } from '#lib';
 	import { Box, BookOpen, Grid2x2, Package, AlertCircle, RefreshCw } from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();
@@ -11,14 +11,16 @@
 	let showResortModal = $state(false);
 
 	// Always reload data when navigating to this page
-	afterNavigate(() => {
+	afterNavigate(({ shallow, type }) => {
+		if (shallow && type === 'goto') return;
+
 		if (browser) {
-			invalidateAll();
+			refreshAll();
 		}
 	});
 
 	function handleResortComplete() {
-		invalidateAll();
+		refreshAll();
 	}
 </script>
 

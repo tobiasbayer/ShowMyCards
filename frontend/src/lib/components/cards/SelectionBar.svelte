@@ -5,9 +5,9 @@
 -->
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { getDisplayName, Modal, type InventoryCard } from '$lib';
-	import AddToDeckModal from '$lib/components/AddToDeckModal.svelte';
-	import type { AddToDeckCard } from '$lib/utils/deck-add';
+	import { getDisplayName, Modal, type InventoryCard } from '#lib';
+	import AddToDeckModal from '#lib/components/AddToDeckModal.svelte';
+	import type { AddToDeckCard } from '#lib/utils/deck-add.ts';
 	import { CheckCheck, LayersPlus, RefreshCw, Trash2, X } from '@lucide/svelte';
 	import MoveMenu from './MoveMenu.svelte';
 	import { plural } from './format';

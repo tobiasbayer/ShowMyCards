@@ -5,8 +5,8 @@
 -->
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import type { InventoryCard, Inventory } from '$lib';
-	import { getAvailableTreatments } from '$lib';
+	import type { InventoryCard, Inventory } from '#lib';
+	import { getAvailableTreatments } from '#lib';
 	import { Check, ChevronDown, MapPin, Plus } from '@lucide/svelte';
 	import { live, ui } from './live.svelte';
 	import { existingLocation, finishLabel, locationName } from './owned';

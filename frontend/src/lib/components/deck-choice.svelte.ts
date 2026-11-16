@@ -1,7 +1,7 @@
 // The deck that cards are added to in the Add to deck dialog: one picked from
 // the list, or a new deck being named, which is created when the cards are added.
 
-import { decksApi, notifications, type DeckSummary } from '$lib';
+import { decksApi, notifications, type DeckSummary } from '#lib';
 
 // Remember the last deck used so repeat adds are a single click. Per-viewer
 // convenience only, so storage failures (private mode etc.) are ignored.

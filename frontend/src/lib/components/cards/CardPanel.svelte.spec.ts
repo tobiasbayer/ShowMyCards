@@ -1,7 +1,7 @@
 import { page } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import type { DeckCardUsage } from '$lib';
+import type { DeckCardUsage } from '#lib';
 import CardPanel from './CardPanel.svelte';
 import { live } from './live.svelte';
 import { card, cardsView, fakeBackend, row, type FakeBackend } from './test-fixtures';
@@ -9,7 +9,7 @@ import { card, cardsView, fakeBackend, row, type FakeBackend } from './test-fixt
 vi.mock('$app/navigation', () => ({
 	goto: vi.fn(),
 	invalidate: vi.fn(),
-	invalidateAll: vi.fn(),
+	refreshAll: vi.fn(),
 	afterNavigate: vi.fn(),
 	beforeNavigate: vi.fn(),
 	onNavigate: vi.fn(),

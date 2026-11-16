@@ -4,9 +4,9 @@
 	The selection bar reuses it with a text label, opening upwards.
 -->
 <script lang="ts">
-	import type { StorageLocation } from '$lib';
+	import type { StorageLocation } from '#lib';
 	import { ArrowRightLeft } from '@lucide/svelte';
-	import Dropdown from '$lib/components/Dropdown.svelte';
+	import Dropdown from '#lib/components/Dropdown.svelte';
 	import { countOpen } from './live.svelte';
 
 	let {

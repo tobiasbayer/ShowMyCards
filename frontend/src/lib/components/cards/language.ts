@@ -1,7 +1,7 @@
 // The Cards page's language dropdown: which languages it offers and
 // what each scope shows when none was picked.
 
-import { SCRYFALL_LANGUAGES } from '$lib/constants';
+import { SCRYFALL_LANGUAGES } from '#lib/constants.ts';
 import type { Source } from './view.svelte';
 
 /** "Any language": no filter in the collection, `l:any` on Scryfall. */

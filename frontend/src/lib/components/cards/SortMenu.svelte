@@ -5,8 +5,8 @@
 -->
 <script lang="ts">
 	import { ArrowDownUp, Check } from '@lucide/svelte';
-	import Dropdown from '$lib/components/Dropdown.svelte';
-	import { currency } from '$lib/stores/currency.svelte';
+	import Dropdown from '#lib/components/Dropdown.svelte';
+	import { currency } from '#lib/stores/currency.svelte.ts';
 	import { sortParam, type PriceSort } from './sort';
 	import { countOpen } from './live.svelte';
 

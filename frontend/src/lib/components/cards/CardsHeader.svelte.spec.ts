@@ -7,7 +7,7 @@ import { card, cardsView, row } from './test-fixtures';
 vi.mock('$app/navigation', () => ({
 	goto: vi.fn(),
 	invalidate: vi.fn(),
-	invalidateAll: vi.fn(),
+	refreshAll: vi.fn(),
 	afterNavigate: vi.fn(),
 	beforeNavigate: vi.fn(),
 	onNavigate: vi.fn(),

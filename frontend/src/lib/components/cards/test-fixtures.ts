@@ -7,7 +7,7 @@ import type {
 	Inventory,
 	InventoryCard,
 	StorageLocation
-} from '$lib';
+} from '#lib';
 import { CardsView, type CardsPageData } from './view.svelte';
 
 export function row(

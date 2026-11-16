@@ -9,7 +9,7 @@ import {
 	type Inventory,
 	type InventoryCard,
 	type StorageLocation
-} from '$lib';
+} from '#lib';
 import { errorMessage, plural } from './format';
 import { live } from './live.svelte';
 import { currentRows, locationName, scopeRows } from './owned';

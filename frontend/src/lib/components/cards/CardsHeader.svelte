@@ -8,7 +8,7 @@
 	import { navigating } from '$app/state';
 	import { untrack } from 'svelte';
 	import { Search, SlidersHorizontal } from '@lucide/svelte';
-	import { typedLanguageClause } from '$lib/utils/language-clause';
+	import { typedLanguageClause } from '#lib/utils/language-clause.ts';
 	import LanguageMenu from './LanguageMenu.svelte';
 	import { plural } from './format';
 	import ScopeMenu from './ScopeMenu.svelte';

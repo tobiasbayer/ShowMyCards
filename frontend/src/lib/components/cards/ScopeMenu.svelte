@@ -3,9 +3,9 @@
 	Unassigned. Picking one reruns the search in that scope.
 -->
 <script lang="ts">
-	import type { StorageLocation } from '$lib';
+	import type { StorageLocation } from '#lib';
 	import { Check } from '@lucide/svelte';
-	import Dropdown from '$lib/components/Dropdown.svelte';
+	import Dropdown from '#lib/components/Dropdown.svelte';
 	import { countOpen } from './live.svelte';
 	import { locationName } from './owned';
 	import type { Scope } from './view.svelte';

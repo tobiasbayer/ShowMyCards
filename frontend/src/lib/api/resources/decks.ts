@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { CreateDeckItemRequest, CreateDeckRequest, DeckCardUsage, DeckSummary } from '$lib';
+import type { CreateDeckItemRequest, CreateDeckRequest, DeckCardUsage, DeckSummary } from '#lib';
 
 /** A deck as returned by create (BaseModel fields flattened at runtime). */
 export interface CreatedDeck {

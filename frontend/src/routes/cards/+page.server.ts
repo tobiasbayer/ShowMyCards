@@ -3,14 +3,14 @@ import {
 	type CollectionSearchResponse,
 	type QueryErrorResponse,
 	type SearchResponse
-} from '$lib';
-import { loadStorageLocations } from '$lib/server/storage';
-import { withLanguage } from '$lib/utils/language-clause';
+} from '#lib';
+import { loadStorageLocations } from '#lib/server/storage.ts';
+import { withLanguage } from '#lib/utils/language-clause.ts';
 import type { PageServerLoad } from './$types';
-import type { CardsPageData } from '$lib/components/cards/view.svelte';
-import { catalogSearch } from '$lib/components/cards/catalog';
-import { ANY_LANGUAGE, parseLanguage } from '$lib/components/cards/language';
-import { parseSort, withOrder } from '$lib/components/cards/sort';
+import type { CardsPageData } from '#lib/components/cards/view.svelte.ts';
+import { catalogSearch } from '#lib/components/cards/catalog.ts';
+import { ANY_LANGUAGE, parseLanguage } from '#lib/components/cards/language.ts';
+import { parseSort, withOrder } from '#lib/components/cards/sort.ts';
 
 // The cards for the URL's scope and search, the storage locations (scope dropdown,
 // Move and Add) and the Settings language (All cards' default).

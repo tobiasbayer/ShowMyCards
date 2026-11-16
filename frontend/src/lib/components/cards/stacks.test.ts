@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Inventory } from '$lib';
+import type { Inventory } from '#lib';
 import {
 	aggregateStacks,
 	idsBetween,

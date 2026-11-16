@@ -1,6 +1,6 @@
 // Other printings of a card, for the detail panel's thumbnail strip.
 
-import { searchApi, type InventoryCard } from '$lib';
+import { searchApi, type InventoryCard } from '#lib';
 
 // Each lookup is one Scryfall request (1 per second), so they are cached per
 // card and language for the session. A failed request isn't cached, so opening
