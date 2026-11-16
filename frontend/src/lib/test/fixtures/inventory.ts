@@ -1,4 +1,4 @@
-import type { Inventory, InventoryCard } from '$lib';
+import type { Inventory, InventoryCard } from '#lib';
 
 export function inventoryItem(id: number, overrides: Partial<Inventory> = {}): Inventory {
 	return {

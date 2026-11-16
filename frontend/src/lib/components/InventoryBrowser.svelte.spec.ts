@@ -1,13 +1,11 @@
 import { createRawSnippet } from 'svelte';
 import { page } from 'vitest/browser';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import { inventoryCard, inventoryItem } from '$lib/test/fixtures/inventory';
-import { keyboard } from '$lib/stores/keyboard.svelte';
-import { currency } from '$lib/stores/currency.svelte';
+import { inventoryCard, inventoryItem } from '#lib/test/fixtures/inventory.ts';
+import { keyboard } from '#lib/stores/keyboard.svelte.ts';
+import { currency } from '#lib/stores/currency.svelte.ts';
 import InventoryBrowser from './InventoryBrowser.svelte';
-
-vi.mock('$app/navigation', () => ({ invalidateAll: vi.fn() }));
 
 const header = createRawSnippet(() => ({ render: () => '<h1>All Cards</h1>' }));
 const cards = [

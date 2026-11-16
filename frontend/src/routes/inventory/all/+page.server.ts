@@ -1,4 +1,4 @@
-import { fetchAllInventoryCards } from '$lib/server/inventory-cards';
+import { fetchAllInventoryCards } from '#lib/server/inventory-cards.ts';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ fetch, depends, setHeaders }) => {

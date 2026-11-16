@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { inventoryCard, inventoryItem } from '$lib/test/fixtures/inventory';
+import { inventoryCard, inventoryItem } from '#lib/test/fixtures/inventory.ts';
 import { fetchAllInventoryCards } from './inventory-cards';
 
 function page(data: ReturnType<typeof inventoryCard>[], totalPages = 1) {

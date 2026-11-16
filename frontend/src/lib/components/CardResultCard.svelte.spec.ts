@@ -1,10 +1,8 @@
 import { page } from 'vitest/browser';
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import type { EnhancedCardResult } from '$lib';
+import type { EnhancedCardResult } from '#lib';
 import CardResultCard from './CardResultCard.svelte';
-
-vi.mock('$app/navigation', () => ({ invalidateAll: vi.fn() }));
 
 function makeCard(overrides: Partial<EnhancedCardResult> = {}): EnhancedCardResult {
 	return {

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import type { Inventory } from '$lib';
+	import type { Inventory } from '#lib';
 
 	let { inventory }: { inventory: Inventory[] } = $props();
 

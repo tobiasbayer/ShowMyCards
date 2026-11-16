@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import type { PageData, ActionData } from './$types';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
@@ -14,8 +14,8 @@
 		getActionError,
 		type ScryfallCard,
 		type EnrichedDeckItem
-	} from '$lib';
-	import type { DeckGroupMode, DeckSortMode } from '$lib/utils/deck-grouping';
+	} from '#lib';
+	import type { DeckGroupMode, DeckSortMode } from '#lib/utils/deck-grouping.ts';
 	import { ArrowLeft, Pencil, Trash2, Search, Info } from '@lucide/svelte';
 
 	let { data, form }: { data: PageData; form: ActionData } = $props();

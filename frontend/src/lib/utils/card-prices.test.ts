@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inventoryCard, inventoryItem } from '$lib/test/fixtures/inventory';
+import { inventoryCard, inventoryItem } from '#lib/test/fixtures/inventory.ts';
 import { getInventoryUnitPrice, sortInventoryCardsByPrice } from './card-prices';
 
 describe('inventory prices', () => {

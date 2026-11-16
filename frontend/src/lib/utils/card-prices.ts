@@ -1,5 +1,5 @@
-import type { CardPrices, EnhancedCardResult } from '$lib';
-import type { Currency } from '$lib/stores/currency.svelte';
+import type { CardPrices, EnhancedCardResult } from '#lib';
+import type { Currency } from '#lib/stores/currency.svelte.ts';
 
 /** Select the same treatment price for display and sorting. */
 export function getTreatmentPrice(

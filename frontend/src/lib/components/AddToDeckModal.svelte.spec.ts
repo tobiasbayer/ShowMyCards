@@ -1,7 +1,7 @@
 import { page } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import type { DeckSummary } from '$lib';
+import type { DeckSummary } from '#lib';
 import AddToDeckModal from './AddToDeckModal.svelte';
 
 function deck(id: number, name: string): DeckSummary {

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import { PageHeader, InventoryBrowser } from '$lib';
+	import { PageHeader, InventoryBrowser } from '#lib';
 	import { resolve } from '$app/paths';
 	import { ArrowLeft } from '@lucide/svelte';
 

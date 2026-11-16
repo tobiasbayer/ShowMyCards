@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
-	import type { EnhancedCardResult, Inventory, StorageLocation, CardActions } from '$lib';
+	import type { EnhancedCardResult, Inventory, StorageLocation, CardActions } from '#lib';
 	import {
 		getCardTreatmentName,
 		getDisplayName,
@@ -10,7 +10,7 @@
 		keyboard,
 		selection,
 		audio
-	} from '$lib';
+	} from '#lib';
 	import { FolderInput, LayersPlus } from '@lucide/svelte';
 	import AddToDeckModal from './AddToDeckModal.svelte';
 	import PriceLozenge from './PriceLozenge.svelte';
@@ -18,11 +18,10 @@
 	import PrintingConflictModal from './PrintingConflictModal.svelte';
 	import TreatmentBadge from './TreatmentBadge.svelte';
 	import CardInventoryLocations from './CardInventoryLocations.svelte';
-	import { deserialize } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { deserialize, type ActionResult } from '$app/forms';
+	import { refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import type { ActionResult } from '@sveltejs/kit';
-	import type { ByOracleResponse, ExistingPrintingInfo } from '$lib/types/api';
+	import type { ByOracleResponse, ExistingPrintingInfo } from '#lib/types/api.ts';
 
 	let {
 		card,
@@ -71,7 +70,7 @@
 	// Refresh the "free for decks" indicator when this tile shows one; other views
 	// (e.g. search) have nothing deck-related to reload.
 	function handleAddedToDeck() {
-		if (deck) invalidateAll();
+		if (deck) refreshAll();
 	}
 
 	// Printing conflict modal state
@@ -165,7 +164,7 @@
 			id: Date.now(), // Temporary ID
 			scryfall_id: card.id,
 			oracle_id: card.oracle_id,
-			treatment: treatment,
+			treatment,
 			quantity: 1,
 			storage_location_id: undefined,
 			storage_location: undefined,
@@ -389,7 +388,7 @@
 		<LayersPlus class="h-4 w-4" />
 	</button>
 	<!-- Clickable image to card details -->
-	<a href={resolve(`/cards/${card.id}`)} class="block">
+	<a href={resolve(`cards/${card.id}`)} class="block">
 		{#if card.image_uri}
 			<figure class="cursor-pointer hover:opacity-90 transition-opacity">
 				<img src={card.image_uri} alt={card.name} loading="lazy" />
@@ -407,10 +406,9 @@
 			<div>
 				<!-- Clickable name to card details -->
 				<a
-					href={resolve(`/cards/${card.id}`)}
-					class="card-title text-lg hover:text-primary transition-colors">
-					{getDisplayName(card)}
-				</a>
+					href={resolve(`cards/${card.id}`)}
+					class="card-title text-lg hover:text-primary transition-colors">{getDisplayName(card)}</a>
+
 				<div class="text-sm opacity-70 flex items-center gap-2 flex-wrap">
 					<span>{card.set_name}</span>
 					<span class="badge badge-outline badge-xs uppercase">{card.language}</span>
@@ -470,9 +468,7 @@
 					</div>
 					<!-- Price -->
 					{#if card.prices && (card.prices.usd || card.prices.usd_foil || card.prices.usd_etched)}
-						<div class="py-1">
-							<PriceLozenge {treatment} prices={card.prices} />
-						</div>
+						<div class="py-1"><PriceLozenge {treatment} prices={card.prices} /></div>
 					{/if}
 					<!-- Quantity (prominent) -->
 					<div class="text-2xl font-bold my-1">{quantity}</div>

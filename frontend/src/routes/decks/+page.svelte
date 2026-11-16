@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
+	import { browser } from '$app/env';
 	import type { PageData } from './$types';
 	import { enhance } from '$app/forms';
 	import {
@@ -11,7 +11,7 @@
 		DeckCard,
 		notifications,
 		getActionError
-	} from '$lib';
+	} from '#lib';
 	import { Plus } from '@lucide/svelte';
 
 	let { data }: { data: PageData } = $props();

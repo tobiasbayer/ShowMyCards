@@ -1,5 +1,5 @@
-import { BACKEND_URL } from '$lib/config';
-import type { InventoryCard, InventoryCardsResponse } from '$lib';
+import { BACKEND_URL } from '#lib/config.ts';
+import type { InventoryCard, InventoryCardsResponse } from '#lib';
 
 /** Load the complete collection, merging printings split across inventory-record pages. */
 export async function fetchAllInventoryCards(
