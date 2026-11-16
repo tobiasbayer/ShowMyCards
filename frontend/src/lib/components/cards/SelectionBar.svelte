@@ -5,10 +5,11 @@
 -->
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { fly } from 'svelte/transition';
 	import { getDisplayName, Modal, type InventoryCard } from '#lib';
 	import AddToDeckModal from '#lib/components/AddToDeckModal.svelte';
 	import type { AddToDeckCard } from '#lib/utils/deck-add.ts';
-	import { CheckCheck, LayersPlus, RefreshCw, Trash2, X } from '@lucide/svelte';
+	import { Check, CheckCheck, LayersPlus, RefreshCw, Trash2, X } from '@lucide/svelte';
 	import MoveMenu from './MoveMenu.svelte';
 	import { plural } from './format';
 	import { ui } from './live.svelte';
@@ -126,15 +127,20 @@
 
 {#if view.selecting}
 	<div
-		class="fixed bottom-16 left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1 rounded-full border border-base-300 bg-base-100 py-1.5 pr-1.5 pl-4 shadow-xl"
+		class="fixed bottom-16 left-1/2 z-50 flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1 rounded-full border border-primary/40 bg-base-200 p-1.5 shadow-2xl"
 		role="toolbar"
-		aria-label="Selected cards">
-		<span class="text-sm font-medium whitespace-nowrap tabular-nums" title={countTip}>
+		aria-label="Selected cards"
+		transition:fly={{ y: 16, duration: 180 }}>
+		<span
+			class="badge badge-primary h-7 gap-1 rounded-full px-2.5 text-sm font-semibold whitespace-nowrap tabular-nums"
+			title={countTip}>
+			{#if running}
+				<span class="loading loading-spinner loading-xs"></span>
+			{:else}
+				<Check class="size-3.5" strokeWidth={3} aria-hidden="true" />
+			{/if}
 			{cards.length}<span class="max-sm:sr-only">&nbsp;selected</span>
 		</span>
-		{#if running}
-			<span class="loading loading-spinner loading-xs ml-1 opacity-50"></span>
-		{/if}
 		{#if !allChecked}
 			<button
 				type="button"
@@ -147,7 +153,7 @@
 			</button>
 		{/if}
 
-		<div class="mx-1 h-5 w-px shrink-0 bg-base-300"></div>
+		<div class="mx-1 h-5 w-px shrink-0 bg-base-content/15"></div>
 
 		<MoveMenu
 			locations={view.locations}
