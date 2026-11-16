@@ -243,9 +243,8 @@
 	{#if readOnly && loadError}
 		<Notification type="error">{loadError}</Notification>
 	{:else if cards.length === 0}
-		<EmptyState message={emptyMessage}>
-			<a href={resolve('search')} class="btn btn-primary">Search for Cards</a>
-		</EmptyState>
+		<EmptyState message={emptyMessage}
+			><a href={resolve('search')} class="btn btn-primary">Search for Cards</a></EmptyState>
 	{:else if filteredCards.length === 0}
 		<EmptyState
 			message={deckAvailableOnly

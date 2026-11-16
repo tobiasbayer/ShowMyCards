@@ -1,11 +1,14 @@
 import { createRawSnippet } from 'svelte';
 import { page } from 'vitest/browser';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { inventoryCard, inventoryItem } from '#lib/test/fixtures/inventory.ts';
 import { keyboard } from '#lib/stores/keyboard.svelte.ts';
 import { currency } from '#lib/stores/currency.svelte.ts';
 import InventoryBrowser from './InventoryBrowser.svelte';
+
+// Kit's own runtime (e.g. $app/forms) imports afterNavigate from this module, so it must be stubbed too.
+vi.mock('$app/navigation', () => ({ refreshAll: vi.fn(), afterNavigate: vi.fn() }));
 
 const header = createRawSnippet(() => ({ render: () => '<h1>All Cards</h1>' }));
 const cards = [

@@ -28,8 +28,8 @@
 		<li>
 			<a
 				href={location.id === null
-					? resolve('/inventory/unassigned')
-					: resolve('/inventory/[id]', { id: String(location.id) })}
+					? resolve('inventory/unassigned')
+					: resolve(`inventory/${location.id}`)}
 				class="link link-hover">{location.name}</a>
 			<span class="opacity-70"
 				>· {location.quantity} {location.quantity === 1 ? 'copy' : 'copies'}</span>

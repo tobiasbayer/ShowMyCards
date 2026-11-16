@@ -33,14 +33,10 @@
 		title="Inventory Browser"
 		description="Browse all your cards or explore a storage location">
 		{#snippet actions()}
-			<a href={resolve('/inventory/all')} class="btn btn-primary btn-sm">
-				<Grid2x2 class="w-4 h-4" />
-				All Cards
-			</a>
-			<button class="btn btn-outline btn-sm" onclick={() => (showResortModal = true)}>
-				<RefreshCw class="w-4 h-4" />
-				Re-sort All
-			</button>
+			<a href={resolve('inventory/all')} class="btn btn-primary btn-sm"
+				><Grid2x2 class="w-4 h-4" /> All Cards</a>
+			<button class="btn btn-outline btn-sm" onclick={() => (showResortModal = true)}
+				><RefreshCw class="w-4 h-4" /> Re-sort All</button>
 		{/snippet}
 	</PageHeader>
 

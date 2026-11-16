@@ -26,7 +26,7 @@
 				? 'Cards across all storage locations, including unassigned cards'
 				: `All locations, including unassigned • ${data.cards.length} ${data.cards.length === 1 ? 'printing' : 'printings'} • ${data.totalCopies} ${data.totalCopies === 1 ? 'copy' : 'copies'}`}>
 			{#snippet actions()}
-				<a href={resolve('/inventory')} class="btn bg-base-100 btn-sm">
+				<a href={resolve('inventory')} class="btn bg-base-100 btn-sm">
 					<ArrowLeft class="w-4 h-4" />
 					Back to Locations
 				</a>
