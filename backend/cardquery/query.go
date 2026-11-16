@@ -10,6 +10,8 @@
 // default (Scryfall hides other languages and "extras").
 package cardquery
 
+import "slices"
+
 // Query is a parsed, compiled search.
 type Query struct {
 	match     pred   // nil matches everything
@@ -57,14 +59,22 @@ func CollectionOnlyKeyword(q string) string {
 	return ""
 }
 
-func always(*Printing) bool { return true }
-
+// compile turns a node into a predicate. Option terms (order:, direction:) set
+// how results are sorted and match nothing: they compile to a nil predicate,
+// which AND leaves out and which `-` and `or` reject.
 func (q *Query) compile(n node) (pred, error) {
 	switch n := n.(type) {
 	case andNode:
 		kids, err := q.compileAll(n.kids)
 		if err != nil {
 			return nil, err
+		}
+		kids = slices.DeleteFunc(kids, func(k pred) bool { return k == nil })
+		switch len(kids) {
+		case 0:
+			return nil, nil
+		case 1:
+			return kids[0], nil
 		}
 		return func(p *Printing) bool {
 			for _, k := range kids {
@@ -79,6 +89,11 @@ func (q *Query) compile(n node) (pred, error) {
 		if err != nil {
 			return nil, err
 		}
+		for i, k := range kids {
+			if k == nil {
+				return nil, optionMisuse(n.kids[i], "can't be combined with `or`")
+			}
+		}
 		return func(p *Printing) bool {
 			for _, k := range kids {
 				if k(p) {
@@ -92,18 +107,46 @@ func (q *Query) compile(n node) (pred, error) {
 		if err != nil {
 			return nil, err
 		}
+		if kid == nil {
+			return nil, optionMisuse(n.kid, "can't be negated")
+		}
 		return func(p *Printing) bool { return !kid(p) }, nil
 	case leafNode:
-		p, err := q.compileLeaf(n.tok)
-		if err != nil {
-			return nil, err
-		}
-		if p == nil {
-			return always, nil
-		}
-		return p, nil
+		return q.compileLeaf(n.tok)
 	}
 	return nil, syntaxError(0, "Couldn't read the search")
+}
+
+// optionMisuse is the error for an option term (order:, direction:) under `-`
+// or `or`, which can only apply to the whole search.
+func optionMisuse(n node, reason string) error {
+	if t, ok := firstLeaf(n); ok {
+		return invalidValue(t, reason)
+	}
+	return syntaxError(0, "A sort option %s", reason)
+}
+
+// firstLeaf returns the first term in a node, in query order.
+func firstLeaf(n node) (token, bool) {
+	switch n := n.(type) {
+	case leafNode:
+		return n.tok, true
+	case notNode:
+		return firstLeaf(n.kid)
+	case andNode:
+		for _, k := range n.kids {
+			if t, ok := firstLeaf(k); ok {
+				return t, true
+			}
+		}
+	case orNode:
+		for _, k := range n.kids {
+			if t, ok := firstLeaf(k); ok {
+				return t, true
+			}
+		}
+	}
+	return token{}, false
 }
 
 func (q *Query) compileAll(nodes []node) ([]pred, error) {

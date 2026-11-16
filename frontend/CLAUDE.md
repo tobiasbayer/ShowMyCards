@@ -27,7 +27,7 @@ ShowMyCards/
 │   │   │   ├── +layout.svelte      # Root layout with navigation
 │   │   │   ├── +page.svelte        # Home/dashboard page
 │   │   │   ├── +error.svelte       # Error page
-│   │   │   ├── search/             # Card search
+│   │   │   ├── cards/              # Cards page (search all cards and the collection) + card detail
 │   │   │   ├── storage/            # Storage locations
 │   │   │   ├── inventory/          # Card inventory
 │   │   │   ├── lists/              # Card lists (wishlists, decks)
@@ -521,6 +521,7 @@ Key models available as TypeScript types:
 - **CardPrices** - Price data (USD, EUR, foil variants)
 - **ListSummary** - List with completion statistics
 - **EnrichedListItem** - List item with card data (name, set, price)
-- **InventoryCardsResponse** - Paginated inventory with card data
+- **InventoryCard** - Card result with inventory data and deck availability (search results)
+- **CollectionSearchResponse** - Owned printings matching a collection search
 - **BatchMoveRequest/Response** - Batch operations
 - **ResortResponse** - Re-sorting results with movements

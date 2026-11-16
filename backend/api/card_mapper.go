@@ -125,13 +125,12 @@ func ResolveEnglishPrices(db *gorm.DB, cards map[string]scryfall.Card) map[strin
 	return resolved
 }
 
-// BuildCardResult creates a CardResult from a Scryfall card, extracting all
-// display fields and converting enum types to strings.
 // Multi-face cards (transform, modal double-faced, split, adventure, ...)
-// carry their names and text per face rather than on the card. These helpers
-// fall back to the faces, joined in face order: names with " // " (as Scryfall
-// joins the English name) and text with a "//" line.
+// carry their names and text per face rather than on the card. The helpers
+// below fall back to the faces, joined in face order: names with " // " (as
+// Scryfall joins the English name) and text with a "//" line.
 
+// deref returns the string s points to, or "" for nil.
 func deref(s *string) string {
 	if s == nil {
 		return ""
@@ -206,6 +205,8 @@ func cardPrintedName(card scryfall.Card) *string {
 	return &name
 }
 
+// BuildCardResult creates a CardResult from a Scryfall card, extracting all
+// display fields and converting enum types to strings.
 func BuildCardResult(card scryfall.Card) CardResult {
 	return CardResult{
 		ID:              card.ID,

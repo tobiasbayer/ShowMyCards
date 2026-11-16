@@ -5,6 +5,7 @@ package rules
 import (
 	"backend/models"
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -36,6 +37,9 @@ func (e *Evaluator) EvaluateCard(ctx context.Context, cardData map[string]interf
 	return e.EvaluateCardWithRules(cardData, rules)
 }
 
+// ErrNoMatchingRule means no enabled sorting rule matched the card.
+var ErrNoMatchingRule = errors.New("no matching rule found for card")
+
 // EvaluateCardWithRules evaluates a card against the provided rules and returns the matching storage location.
 // Use this for batch operations to avoid re-fetching rules on every call.
 func (e *Evaluator) EvaluateCardWithRules(cardData map[string]interface{}, rules []models.SortingRule) (*models.StorageLocation, error) {
@@ -50,7 +54,7 @@ func (e *Evaluator) EvaluateCardWithRules(cardData map[string]interface{}, rules
 		}
 	}
 
-	return nil, fmt.Errorf("no matching rule found for card")
+	return nil, ErrNoMatchingRule
 }
 
 // EvaluateExpression evaluates a single expression against card data

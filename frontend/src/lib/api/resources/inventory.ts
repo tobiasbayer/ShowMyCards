@@ -1,7 +1,8 @@
 import { apiClient } from '../client';
-import type { DeckAvailability, Inventory, InventoryCardsResponse } from '$lib';
+import type { DeckAvailability, Inventory, StorageLocation } from '$lib';
 import type {
 	BatchMoveRequest,
+	CreateInventoryRequest,
 	BatchMoveResponse,
 	BatchDeleteRequest,
 	BatchDeleteResponse,
@@ -12,13 +13,11 @@ import type {
 } from '$lib/types/api';
 
 /**
- * Request type for creating inventory
+ * Where the sorting rules would put a new copy (the backend's AutoLocationResponse,
+ * whose generated type leaves the location untyped); null when no rule matches.
  */
-export interface CreateInventoryRequest {
-	scryfall_id: string;
-	treatment: string;
-	quantity: number;
-	storage_location_id?: number;
+export interface AutoLocation {
+	storage_location: StorageLocation | null;
 }
 
 /**
@@ -37,6 +36,18 @@ export interface UpdateInventoryRequest {
 export interface ListInventoryParams {
 	scryfall_id?: string;
 	storage_location_id?: string | number; // Can be "null" for unassigned
+	page_size?: number;
+}
+
+/**
+ * A page of inventory rows (the backend's utils.PaginatedResponse)
+ */
+export interface PaginatedInventoryResponse {
+	data: Inventory[] | null;
+	page: number;
+	page_size: number;
+	total_items: number;
+	total_pages: number;
 }
 
 /**
@@ -71,9 +82,10 @@ export const inventoryApi = {
 		if (params?.scryfall_id) searchParams.set('scryfall_id', params.scryfall_id);
 		if (params?.storage_location_id !== undefined)
 			searchParams.set('storage_location_id', String(params.storage_location_id));
+		if (params?.page_size) searchParams.set('page_size', String(params.page_size));
 
 		const query = searchParams.toString();
-		return apiClient.get<InventoryCardsResponse>(`/inventory${query ? `?${query}` : ''}`);
+		return apiClient.get<PaginatedInventoryResponse>(`/inventory${query ? `?${query}` : ''}`);
 	},
 
 	/**
@@ -89,7 +101,17 @@ export const inventoryApi = {
 		apiClient.get<DeckAvailability>(`/inventory/availability/${encodeURIComponent(oracleId)}`),
 
 	/**
-	 * Create a new inventory item
+	 * Where the sorting rules would put a new copy of a printing in a finish: the
+	 * same code the backend runs when it auto-sorts one.
+	 */
+	autoLocation: (scryfallId: string, treatment: string) =>
+		apiClient.get<AutoLocation>(
+			`/inventory/auto-location?${new URLSearchParams({ scryfall_id: scryfallId, treatment })}`
+		),
+
+	/**
+	 * Create a new inventory item. With `merge`, the copies join an existing stack
+	 * at the resolved location (the response is that stack).
 	 */
 	create: (data: CreateInventoryRequest) => apiClient.post<Inventory>('/inventory', data),
 

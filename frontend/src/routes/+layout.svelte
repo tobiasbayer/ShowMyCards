@@ -4,30 +4,9 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import Navbar from '$lib/components/Navbar.svelte';
 	import Navigation from '$lib/components/Navigation.svelte';
-	import { NotificationContainer, KeyboardShortcutsHelp, Banners, keyboard, audio } from '$lib';
-	import { onMount } from 'svelte';
+	import { NotificationContainer, Banners } from '$lib';
 
 	let { children } = $props();
-
-	onMount(() => {
-		// Initialize keyboard shortcuts and audio
-		keyboard.attach();
-		audio.init();
-
-		// Restore audio settings from localStorage
-		const storedSoundEnabled = localStorage.getItem('soundEnabled');
-		const storedSoundVolume = localStorage.getItem('soundVolume');
-		if (storedSoundEnabled !== null) {
-			audio.setEnabled(storedSoundEnabled === 'true');
-		}
-		if (storedSoundVolume !== null) {
-			audio.setVolume(parseInt(storedSoundVolume, 10) / 100);
-		}
-
-		return () => {
-			keyboard.detach();
-		};
-	});
 </script>
 
 <svelte:head>
@@ -51,6 +30,3 @@
 
 <!-- Global notification container -->
 <NotificationContainer />
-
-<!-- Keyboard shortcuts help overlay -->
-<KeyboardShortcutsHelp />

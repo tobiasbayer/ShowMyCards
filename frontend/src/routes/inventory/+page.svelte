@@ -31,7 +31,7 @@
 		title="Inventory Browser"
 		description="Browse all your cards or explore a storage location">
 		{#snippet actions()}
-			<a href={resolve('/search')} class="btn btn-primary btn-sm">
+			<a href={resolve('/cards')} class="btn btn-primary btn-sm">
 				<Grid2x2 class="w-4 h-4" />
 				All Cards
 			</a>
@@ -50,7 +50,7 @@
 
 	{#if data.locations.length === 0 && data.unassignedCount === 0}
 		<EmptyState message="No inventory found">
-			<a href={resolve('/search')} class="btn btn-primary">
+			<a href={resolve('/cards?source=catalog')} class="btn btn-primary">
 				<Package class="w-4 h-4" />
 				Search for Cards
 			</a>
@@ -77,9 +77,7 @@
 
 							<!-- Browse Button -->
 							<div class="ml-auto">
-								<a
-									href={resolve('/search?location=unassigned' as '/search')}
-									class="btn btn-primary btn-sm">
+								<a href={resolve('/cards?location=unassigned')} class="btn btn-primary btn-sm">
 									<Grid2x2 class="w-4 h-4" />
 									Browse
 								</a>
@@ -111,9 +109,7 @@
 
 							<!-- Browse Button -->
 							<div class="ml-auto">
-								<a
-									href={resolve(`/search?location=${location.id}` as '/search')}
-									class="btn btn-primary btn-sm">
+								<a href={resolve(`/cards?location=${location.id}`)} class="btn btn-primary btn-sm">
 									<Grid2x2 class="w-4 h-4" />
 									Browse
 								</a>

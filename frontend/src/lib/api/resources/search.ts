@@ -7,6 +7,8 @@ import type { SearchResponse } from '$lib';
 export interface SearchParams {
 	q: string;
 	page?: number;
+	/** A language code or `any`; without it the backend uses the Settings language. */
+	lang?: string;
 }
 
 /**
@@ -32,6 +34,7 @@ export const searchApi = {
 		const searchParams = new URLSearchParams();
 		searchParams.set('q', params.q);
 		if (params.page) searchParams.set('page', String(params.page));
+		if (params.lang) searchParams.set('lang', params.lang);
 
 		return apiClient.get<SearchResponse>(`/search?${searchParams.toString()}`);
 	}

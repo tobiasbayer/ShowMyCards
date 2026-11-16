@@ -35,7 +35,6 @@ type ScryfallAPI interface {
 	GetCard(ctx context.Context, id string) (scryfall.Card, error)
 	ListSets(ctx context.Context) ([]scryfall.Set, error)
 	ListCardSymbols(ctx context.Context) ([]scryfall.CardSymbol, error)
-	AutocompleteCard(ctx context.Context, s string) ([]string, error)
 }
 
 // Client wraps the Scryfall API client with caching
@@ -155,14 +154,6 @@ func (c *Client) ListSymbols(ctx context.Context) ([]scryfall.CardSymbol, error)
 	defer cancel()
 
 	return c.api.ListCardSymbols(ctx)
-}
-
-// Autocomplete returns card name suggestions for a partial query.
-func (c *Client) Autocomplete(ctx context.Context, query string) ([]string, error) {
-	ctx, cancel := context.WithTimeout(ctx, DefaultAPITimeout)
-	defer cancel()
-
-	return c.api.AutocompleteCard(ctx, query)
 }
 
 // GetByID retrieves a card by its Scryfall ID.

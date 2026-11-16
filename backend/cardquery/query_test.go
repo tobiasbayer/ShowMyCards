@@ -238,6 +238,8 @@ func TestMatch(t *testing.T) {
 		{"", except()},
 		{"order:name", except()},
 		{"order:usd direction:desc", except()},
+		{"bolt order:name", bolts},
+		{"(bolt order:name) or krenko", bolts + " krenko"},
 	}
 
 	for _, tt := range tests {
@@ -265,6 +267,9 @@ func TestParseErrors(t *testing.T) {
 		{"o:/draw/", CodeUnsupported, "o", "Regular expressions aren't available in your collection"},
 		{"is:firstprint", CodeUnsupported, "is", "`is:firstprint` isn't available in your collection"},
 		{"order:penny", CodeUnsupported, "order", ""},
+		{"bolt -order:name", CodeInvalidValue, "order", "Couldn't read `order:name`: can't be negated"},
+		{"bolt or direction:asc", CodeInvalidValue, "direction", "Couldn't read `direction:asc`: can't be combined with `or`"},
+		{"bolt or (order:cmc direction:desc)", CodeInvalidValue, "order", ""},
 		{"foo:bar", CodeUnknownKeyword, "foo", "`foo:` isn't a search keyword"},
 		{"mv<=", CodeInvalidValue, "mv", "Couldn't read `mv<=`: expected a number"},
 		{"c:xyz", CodeInvalidValue, "c", ""},

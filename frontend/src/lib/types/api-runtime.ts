@@ -42,11 +42,6 @@ export interface InventoryCard extends EnhancedCardResult {
 	deck: Generated.DeckAvailability;
 }
 
-// Inventory cards response with runtime-accurate card results
-export interface InventoryCardsResponse extends Omit<Generated.InventoryCardsResponse, 'data'> {
-	data: InventoryCard[];
-}
-
 // Override SearchResponse to use runtime InventoryCard (results carry deck availability)
 export interface SearchResponse extends Omit<Generated.SearchResponse, 'data'> {
 	data: InventoryCard[];

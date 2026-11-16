@@ -6,7 +6,6 @@
 		notifications,
 		type DeckAvailability,
 		type DeckCardUsage,
-		type DeckSummary,
 		type DeckZone
 	} from '$lib';
 	import {
@@ -16,7 +15,9 @@
 		sharedCopyNotice,
 		type AddToDeckCard
 	} from '$lib/utils/deck-add';
-	import { Info, LayersPlus, Plus } from '@lucide/svelte';
+	import { Info, LayersPlus } from '@lucide/svelte';
+	import { DeckChoice } from './deck-choice.svelte';
+	import DeckField from './DeckField.svelte';
 	import Modal from './Modal.svelte';
 
 	interface Props {
@@ -42,48 +43,19 @@
 		{ value: 'maybe', label: 'Maybe' }
 	];
 
-	// Remember the last deck used so repeat adds are a single click. Per-viewer
-	// convenience only, so storage failures (private mode etc.) are ignored.
-	const LAST_DECK_KEY = 'smc-last-deck-id';
-
-	function readLastDeck(): string {
-		try {
-			return localStorage.getItem(LAST_DECK_KEY) ?? '';
-		} catch {
-			return '';
-		}
-	}
-
-	function rememberDeck(id: string) {
-		try {
-			localStorage.setItem(LAST_DECK_KEY, id);
-		} catch {
-			// ignore
-		}
-	}
-
-	let decks = $state<DeckSummary[]>([]);
-	let loadState = $state<'loading' | 'ready' | 'error'>('loading');
-	let deckId = $state('');
 	let zone = $state<DeckZone>('main');
 	let qty = $state(1);
 	let copiesMode = $state<'copies' | 'one'>('copies');
 	let pin = $state(false);
 	let saving = $state(false);
 
-	let creatingDeck = $state(false);
-	let newDeckName = $state('');
-	let savingDeck = $state(false);
+	const choice = new DeckChoice();
 
 	const totalCopies = $derived(cards.reduce((sum, c) => sum + c.copies, 0));
 	const single = $derived(!bulk && cards.length === 1 ? cards[0] : null);
 	const previewNames = $derived(cards.slice(0, 3).map((c) => c.name));
-	const selectedDeck = $derived(decks.find((d) => String(d.id) === deckId));
-	// While "New" is open, the deck being named is the target, never the deck
-	// selected before it, which stays in `deckId` for Cancel.
-	const hasTarget = $derived(creatingDeck ? !!newDeckName.trim() && !savingDeck : !!selectedDeck);
 	const canSubmit = $derived(
-		hasTarget && cards.length > 0 && !saving && (bulk || (Number.isInteger(qty) && qty >= 1))
+		choice.hasTarget && cards.length > 0 && !saving && (bulk || (Number.isInteger(qty) && qty >= 1))
 	);
 
 	// Advisory only: how many copies of the card are free and which decks already
@@ -113,7 +85,7 @@
 	});
 
 	// A deck still being named has no items, so every deck wanting the card is another deck.
-	const targetDeckId = $derived(creatingDeck ? null : selectedDeck?.id);
+	const targetDeckId = $derived(choice.targetId);
 	const sharedCopies = $derived(
 		copyInfo && targetDeckId !== undefined && Number.isInteger(qty) && qty >= 1
 			? sharedCopyNotice(copyInfo.availability, copyInfo.usage, {
@@ -124,70 +96,18 @@
 			: null
 	);
 
-	async function loadDecks() {
-		loadState = 'loading';
-		try {
-			decks = await decksApi.list();
-			const last = readLastDeck();
-			if (decks.some((d) => String(d.id) === last)) {
-				deckId = last;
-			} else if (decks.length === 1) {
-				deckId = String(decks[0].id);
-			}
-			creatingDeck = decks.length === 0;
-			loadState = 'ready';
-		} catch {
-			loadState = 'error';
-		}
-	}
-
 	$effect(() => {
 		if (open)
 			untrack(() => {
 				pin = pinByDefault;
-				loadDecks();
+				choice.load();
 			});
 	});
 
-	/** Creates the deck being named and selects it. Resolves to it, or undefined when that failed. */
-	async function createDeck(): Promise<DeckSummary | undefined> {
-		const name = newDeckName.trim();
-		if (!name || savingDeck) return undefined;
-		savingDeck = true;
-		try {
-			const created = await decksApi.create({ name, description: '' });
-			const summary: DeckSummary = {
-				id: created.id,
-				name: created.name,
-				description: created.description ?? '',
-				created_at: '',
-				updated_at: '',
-				total_items: 0,
-				total_cards_demand: 0,
-				aggregate_shortfall: 0,
-				aggregate_over_committed: 0
-			};
-			decks = [summary, ...decks];
-			deckId = String(created.id);
-			creatingDeck = false;
-			newDeckName = '';
-			return summary;
-		} catch (e) {
-			notifications.error(e instanceof Error ? e.message : 'Failed to create deck');
-			return undefined;
-		} finally {
-			savingDeck = false;
-		}
-	}
-
-	function handleNewDeckKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter') {
-			e.preventDefault();
-			createDeck();
-		} else if (e.key === 'Escape' && decks.length > 0) {
-			e.preventDefault();
-			creatingDeck = false;
-		}
+	// Esc closes the dialog, unless something inside handled it (the new-deck name
+	// cancels "New"; an open dropdown takes Esc before it gets here).
+	function onKeydown(e: KeyboardEvent) {
+		if (open && e.key === 'Escape' && !e.defaultPrevented && !saving) onClose();
 	}
 
 	async function submit(e: SubmitEvent) {
@@ -206,21 +126,12 @@
 
 		saving = true;
 		try {
-			// A name typed under "New" is the deck meant: create it first.
-			const deck = creatingDeck ? await createDeck() : selectedDeck;
+			// A name typed under "New" is the deck meant: it is created first.
+			const deck = await choice.target();
 			if (!deck) return;
 
-			const response = await fetch(`/decks/${deck.id}/items`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ items })
-			});
-			if (!response.ok) {
-				const data = await response.json().catch(() => ({}));
-				throw new Error(data.error || 'Failed to add to deck');
-			}
-
-			rememberDeck(String(deck.id));
+			await decksApi.addItems(deck.id, items);
+			choice.remember(deck);
 			const zoneLabel = ZONES.find((z) => z.value === zone)?.label ?? zone;
 			const added = single
 				? `Added ${qty > 1 ? `${qty}× ` : ''}${single.name} to ${deck.name} (${zoneLabel})`
@@ -236,6 +147,8 @@
 		}
 	}
 </script>
+
+<svelte:window onkeydown={onKeydown} />
 
 <Modal {open} {onClose} title="Add to deck" boxClass="max-w-md">
 	<form onsubmit={submit} class="space-y-5">
@@ -270,67 +183,7 @@
 			</div>
 		{/if}
 
-		<!-- Deck -->
-		<div class="flex flex-col gap-2">
-			<label for="{uid}-deck" class="font-semibold">Deck</label>
-			{#if loadState === 'loading'}
-				<div class="flex items-center gap-2 text-sm opacity-70">
-					<span class="loading loading-spinner loading-sm"></span>
-					Loading decks…
-				</div>
-			{:else if loadState === 'error'}
-				<div role="alert" class="alert alert-error alert-soft py-2 text-sm">
-					<span>Couldn't load your decks.</span>
-					<button type="button" class="btn btn-ghost btn-xs" onclick={loadDecks}>Retry</button>
-				</div>
-			{:else if creatingDeck}
-				{#if decks.length === 0}
-					<p class="text-sm opacity-70">You have no decks yet. Name your first one:</p>
-				{/if}
-				<div class="join w-full">
-					<input
-						id="{uid}-deck"
-						class="input input-sm join-item flex-1"
-						placeholder="New deck name"
-						bind:value={newDeckName}
-						onkeydown={handleNewDeckKeydown}
-						disabled={savingDeck} />
-					<button
-						type="button"
-						class="btn btn-sm btn-primary join-item"
-						onclick={createDeck}
-						disabled={!newDeckName.trim() || savingDeck}>
-						{#if savingDeck}<span class="loading loading-spinner loading-xs"></span>{/if}
-						Create
-					</button>
-					{#if decks.length > 0}
-						<button
-							type="button"
-							class="btn btn-sm join-item"
-							onclick={() => (creatingDeck = false)}>
-							Cancel
-						</button>
-					{/if}
-				</div>
-			{:else}
-				<div class="flex gap-2">
-					<select id="{uid}-deck" class="select select-sm flex-1" bind:value={deckId}>
-						<option value="" disabled>Select a deck…</option>
-						{#each decks as deck (deck.id)}
-							<option value={String(deck.id)}>{deck.name}</option>
-						{/each}
-					</select>
-					<button
-						type="button"
-						class="btn btn-sm btn-ghost"
-						onclick={() => (creatingDeck = true)}
-						title="Create a new deck">
-						<Plus class="h-4 w-4" />
-						New
-					</button>
-				</div>
-			{/if}
-		</div>
+		<DeckField {choice} id="{uid}-deck" />
 
 		<!-- Zone -->
 		<fieldset class="flex flex-col gap-2">

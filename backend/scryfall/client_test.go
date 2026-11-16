@@ -77,10 +77,6 @@ func (m *mockAPI) ListCardSymbols(ctx context.Context) ([]scryfall.CardSymbol, e
 	return nil, nil
 }
 
-func (m *mockAPI) AutocompleteCard(ctx context.Context, s string) ([]string, error) {
-	return nil, nil
-}
-
 func TestSearch_Success(t *testing.T) {
 	expectedCards := []scryfall.Card{
 		{ID: "card-1", Name: "Lightning Bolt"},

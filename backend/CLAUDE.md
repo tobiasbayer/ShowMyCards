@@ -201,15 +201,22 @@ Go types are mapped to TypeScript as follows:
   - Query params: `scryfall_id`, `storage_location_id` (or "null" for unassigned)
 - `GET /api/inventory/:id` - Get single inventory item with storage location
 - `POST /api/inventory` - Create inventory item (auto-evaluates sorting rules if no storage location)
+  - `unassigned: true` skips the sorting rules (400 together with `storage_location_id`)
+  - `merge: true` adds the quantity to the oldest row of the same stack (printing,
+    treatment, resolved location) and returns it with 200; without such a row it inserts (201)
 - `PUT /api/inventory/:id` - Update inventory item (partial updates, `clear_storage` flag)
 - `DELETE /api/inventory/:id` - Delete inventory item
-- `GET /api/inventory/cards` - List inventory as enhanced card results with Scryfall data
-  - Query params: `page`, `page_size`, `storage_location_id`
-- `GET /api/inventory/by-oracle/:oracle_id` - Get all printings of a card by oracle ID
+- `POST /api/inventory/:id/split-move` - Move `quantity` copies of a stack to `storage_location_id`
+  (absent = unassigned); consolidates the source stack's rows and merges into a stack already there
 - `GET /api/inventory/search` - Search owned printings with Scryfall syntax, evaluated locally
   (package `cardquery`); every match in one response, newest first unless `order:`
   - Query params: `q`, `storage_location_id` (or "null" for unassigned; absent = everything)
   - Invalid or unsupported queries return 400 `{error, code, keyword}`
+- `GET /api/inventory/auto-location` - Where the sorting rules would put a new copy (same code as
+  Create); `{storage_location}` or null when the card is unknown or no rule matches; 500 on failure
+  - Query params: `scryfall_id` (required), `treatment`
+- `GET /api/inventory/availability/:oracle_id` - Copies of a card owned, decked and free for decks,
+  plus free copies per owned printing (`printings`)
 - `GET /api/inventory/unassigned/count` - Count inventory items without storage location
 - `POST /api/inventory/batch/move` - Batch move items to a storage location
 - `DELETE /api/inventory/batch` - Batch delete inventory items
@@ -269,10 +276,12 @@ Go types are mapped to TypeScript as follows:
 ### Card Search
 
 - `GET /api/search` - Search cards via Scryfall with inventory data
-  - Query params: `q` (search query), `page` (default: 1)
+  - Query params: `q` (search query), `page` (default: 1), `lang` (a language code or `any`;
+    default: the `scryfall_default_language` setting, unless `q` has a language clause)
   - Collection keywords (`finish:`, `qty`, `free`) return 400 `code: collection_only`
-  - Returns enhanced results with inventory info (this printing, other printings)
-- `GET /api/search/:id` - Get single card by Scryfall ID
+  - Returns enhanced results with inventory info (this printing, other printings) and deck
+    availability (`deck`: owned, decked, free, and free copies per owned printing)
+- `GET /api/cards/:id` - Get single card by Scryfall ID
 
 ## Domain Model
 
@@ -398,8 +407,10 @@ Application settings and configuration.
 
 These types are exported to TypeScript via tygo and used in API responses.
 
-### Search Types (`api/search.go`)
+### Search Types (`api/search.go`, `api/collection_search.go`)
 
+- **CollectionSearchResponse** - Every owned printing matching a collection search (`data`, `total_cards`)
+- **QueryErrorResponse** - A rejected query: `error` (one line for people), `code`, `keyword`
 - **SearchResponse** - Paginated search results with `data`, `page`, `total_cards`, `has_more`
 - **CardPrices** - Price data (usd, usd_foil, usd_etched, eur, eur_foil, tix)
 - **CardResult** - Basic card data from Scryfall
@@ -408,9 +419,10 @@ These types are exported to TypeScript via tygo and used in API responses.
 
 ### Inventory Types (`api/inventory.go`)
 
-- **InventoryCardsResponse** - Paginated card results with inventory data
-- **ExistingPrintingInfo** - Info about a printing in inventory (scryfall_id, treatment, quantity, location)
-- **ByOracleResponse** - All printings of a card by oracle ID with unique locations
+- **InventoryCard** - EnhancedCardResult + `deck` (DeckAvailability), the shape of search and collection-search results
+- **DeckAvailability** - Copies owned, decked and free for decks, plus `printings` (free copies per owned printing)
+- **AutoLocationResponse** - The storage location the sorting rules would pick (generated untyped; the frontend declares `AutoLocation`)
+- **SplitMoveRequest/Response** - Moving part of a stack
 - **BatchMoveRequest/Response** - Batch move operations
 - **BatchDeleteRequest/Response** - Batch delete operations
 - **ResortRequest/ResortMovement/ResortResponse** - Re-sorting inventory against rules

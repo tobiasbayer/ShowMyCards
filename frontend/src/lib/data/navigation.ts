@@ -2,7 +2,7 @@ import type { MenuItem } from '$lib/types/navigation';
 import {
 	LayoutDashboard,
 	Cog,
-	Search,
+	GalleryVerticalEnd,
 	Archive,
 	Scale,
 	ListTodo,
@@ -19,9 +19,9 @@ export const menuItems: MenuItem[] = [
 		icon: LayoutDashboard
 	},
 	{
-		name: 'Search',
-		href: '/search',
-		icon: Search
+		name: 'Cards',
+		href: '/cards',
+		icon: GalleryVerticalEnd
 	},
 	{
 		name: 'Import',

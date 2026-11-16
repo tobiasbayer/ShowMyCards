@@ -1,4 +1,3 @@
-import type { Snippet } from 'svelte';
 import type { RuntimeStorageLocation as StorageLocation } from '$lib/types/runtime';
 import type { CardPrices } from '$lib/types/api';
 
@@ -56,93 +55,6 @@ export interface DisplayableCard {
 	_source: unknown;
 	/** Source type discriminator */
 	_sourceType: CardSourceType;
-}
-
-/**
- * Pagination state
- */
-export interface PaginationState {
-	currentPage: number;
-	totalPages: number;
-	pageSize: number;
-	totalItems: number;
-}
-
-/**
- * Column definition for table view
- */
-export interface TableColumn {
-	/** Unique column key */
-	key: string;
-	/** Column header */
-	header: string;
-	/** Width class (Tailwind) */
-	width?: string;
-	/** Whether column is sortable */
-	sortable?: boolean;
-	/** Custom cell renderer snippet */
-	render?: Snippet<[DisplayableCard]>;
-	/** Accessor function for default rendering */
-	accessor?: (item: DisplayableCard) => string | number | undefined;
-}
-
-/**
- * Main CardCollection component props
- */
-export interface CardCollectionProps {
-	/** Items to display (already adapted to DisplayableCard) */
-	items: DisplayableCard[];
-
-	/** Loading state */
-	loading?: boolean;
-
-	/** Current view mode */
-	viewMode?: ViewMode;
-
-	/** Callback when view mode changes */
-	onViewModeChange?: (mode: ViewMode) => void;
-
-	/** Pagination state (undefined = no pagination) */
-	pagination?: PaginationState;
-
-	/** Callback when page changes */
-	onPageChange?: (page: number) => void;
-
-	/** Callback when page size changes */
-	onPageSizeChange?: (size: number) => void;
-
-	/** Available page sizes */
-	pageSizes?: number[];
-
-	/** Enable selection for bulk operations */
-	selectable?: boolean;
-
-	/** Custom columns for table view */
-	columns?: TableColumn[];
-
-	/** Storage locations (for grid view storage dropdown) */
-	storageLocations?: StorageLocation[];
-
-	/** Callback when item is removed (e.g., deleted from inventory) */
-	onItemRemove?: (itemId: string | number) => void;
-
-	/** Empty state message */
-	emptyMessage?: string;
-
-	/** Empty state action slot */
-	emptyAction?: Snippet;
-
-	/** Header area slot (for stats, search form, etc.) */
-	header?: Snippet;
-
-	/** Filter controls slot */
-	filters?: Snippet;
-
-	/** Persist view preference to localStorage */
-	persistViewPreference?: boolean;
-
-	/** Local storage key for view preference */
-	storageKey?: string;
 }
 
 /**

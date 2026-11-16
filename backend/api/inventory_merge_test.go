@@ -317,3 +317,19 @@ func TestInventoryAvailability(t *testing.T) {
 		t.Errorf("unknown card: expected all zeros, got %+v", unknown)
 	}
 }
+
+// A failure to evaluate the rules is an error, not "no location": the frontend
+// would otherwise preview a copy as unassigned that the rules would place.
+func TestInventoryAutoLocation_EvaluationFailure(t *testing.T) {
+	app, db := setupInventoryTestAppWithRules(t)
+	createTestCard(t, db, "bolt-id", "Lightning Bolt", "lea", "common", "0.25")
+	if err := db.Migrator().DropTable(&models.SortingRule{}); err != nil {
+		t.Fatalf("failed to drop sorting rules: %v", err)
+	}
+
+	var got AutoLocationResponse
+	status := getJSON(t, app, "/api/inventory/auto-location?scryfall_id=bolt-id&treatment=nonfoil", &got)
+	if status != http.StatusInternalServerError {
+		t.Fatalf("expected status 500, got %d", status)
+	}
+}

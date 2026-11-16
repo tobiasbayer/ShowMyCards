@@ -183,7 +183,10 @@ func (h *InventoryHandler) Create(c fiber.Ctx) error {
 				return nil
 			}
 		}
-		return tx.Create(&item).Error
+		if err := tx.Create(&item).Error; err != nil {
+			return fmt.Errorf("create item: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
@@ -199,17 +202,20 @@ func (h *InventoryHandler) Create(c fiber.Ctx) error {
 	return c.Status(status).JSON(item)
 }
 
-// findStackRow returns the oldest item of a stack (same printing, treatment and
-// location; a nil location means unassigned), or nil when the stack is empty.
-func findStackRow(tx *gorm.DB, scryfallID, treatment string, locationID *uint) (*models.Inventory, error) {
-	query := tx.Where("scryfall_id = ? AND treatment = ?", scryfallID, treatment)
+// whereStack narrows a query to one stack: the rows of a printing in one
+// treatment at one location (a nil location means unassigned).
+func whereStack(q *gorm.DB, scryfallID, treatment string, locationID *uint) *gorm.DB {
+	q = q.Where("scryfall_id = ? AND treatment = ?", scryfallID, treatment)
 	if locationID == nil {
-		query = query.Where("storage_location_id IS NULL")
-	} else {
-		query = query.Where("storage_location_id = ?", *locationID)
+		return q.Where("storage_location_id IS NULL")
 	}
+	return q.Where("storage_location_id = ?", *locationID)
+}
+
+// findStackRow returns the oldest item of a stack, or nil when the stack is empty.
+func findStackRow(tx *gorm.DB, scryfallID, treatment string, locationID *uint) (*models.Inventory, error) {
 	var row models.Inventory
-	if err := query.Order("id").First(&row).Error; err != nil {
+	if err := whereStack(tx, scryfallID, treatment, locationID).Order("id").First(&row).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -234,9 +240,14 @@ func (h *InventoryHandler) AutoLocation(c fiber.Ctx) error {
 	}
 
 	locationID, err := h.autoSortSvc.DetermineStorageLocation(c.RequestCtx(), scryfallID, c.Query("treatment"))
-	if err != nil || locationID == nil {
+	switch {
+	case errors.Is(err, services.ErrCardNotInCatalog), errors.Is(err, services.ErrNoMatchingRule):
 		// Same as Create: an unknown card or no matching rule means "no location".
-		slog.Debug("auto-sort preview found no location", "component", "inventory", "scryfall_id", scryfallID, "error", err)
+		return c.JSON(AutoLocationResponse{})
+	case err != nil:
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to evaluate sorting rules", "auto-sort preview failed", err)
+	case locationID == nil:
 		return c.JSON(AutoLocationResponse{})
 	}
 
@@ -398,16 +409,6 @@ type InventoryCard struct {
 	Deck               DeckAvailability `json:"deck"`
 }
 
-// InventoryCardsResponse represents paginated card results with inventory data
-// tygo:export
-type InventoryCardsResponse struct {
-	Data       []InventoryCard `json:"data"`
-	Page       int             `json:"page"`
-	PageSize   int             `json:"page_size"`
-	TotalCards int             `json:"total_cards"`
-	TotalPages int             `json:"total_pages"`
-}
-
 // buildEnhancedCardResult creates an EnhancedCardResult from a Scryfall card and inventory items.
 // It extracts prices, images, and converts enum types to strings for JSON serialization.
 func buildEnhancedCardResult(scryfallCard scryfall.Card, inventoryItems []models.Inventory) EnhancedCardResult {
@@ -425,185 +426,6 @@ func buildEnhancedCardResult(scryfallCard scryfall.Card, inventoryItems []models
 		CardResult: cardResult,
 		Inventory:  inventoryData,
 	}
-}
-
-// ListAsCards returns inventory items as enhanced card results (like search)
-func (h *InventoryHandler) ListAsCards(c fiber.Ctx) error {
-	// Parse query params (using smaller max page size for card results)
-	params := utils.ParsePaginationParams(c, utils.DefaultPageSize, DefaultCardsPageSize)
-
-	locationID := c.Query("storage_location_id")
-	deckAvailable := c.Query("deck_available") == "true"
-
-	// Per-Oracle deck availability (owned / decked / free) enriches every card and
-	// powers the "available for deck building" filter.
-	availability, err := h.allocation.ComputeAvailability(c.RequestCtx())
-	if err != nil {
-		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
-			"Failed to compute deck availability", "allocation service failed", err)
-	}
-
-	// Build query
-	query := h.db.WithContext(c.RequestCtx()).Model(&models.Inventory{})
-	if locationID == "null" {
-		query = query.Where("storage_location_id IS NULL")
-	} else if locationID != "" {
-		if err := utils.ValidateNumericParam(locationID, "storage_location_id"); err != nil {
-			return utils.ReturnError(c, fiber.StatusBadRequest, err.Error())
-		}
-		query = query.Where("storage_location_id = ?", locationID)
-	}
-
-	// Constrain to Oracles with at least one free copy when the filter is on. An
-	// empty set yields an empty IN clause (no rows), i.e. "every copy is decked".
-	if deckAvailable {
-		freeOracleIDs := make([]string, 0, len(availability.Oracle))
-		for oracleID, oa := range availability.Oracle {
-			if oa.Free >= 1 {
-				freeOracleIDs = append(freeOracleIDs, oracleID)
-			}
-		}
-		query = query.Where("oracle_id IN ?", freeOracleIDs)
-	}
-
-	// Count total
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
-			"Failed to count inventory items", "count query failed", err)
-	}
-
-	// Get paginated inventory items
-	var inventoryItems []models.Inventory
-	offset := utils.CalculateOffset(params.Page, params.PageSize)
-	if err := query.
-		Preload("StorageLocation").
-		Order("created_at DESC").
-		Limit(params.PageSize).
-		Offset(offset).
-		Find(&inventoryItems).Error; err != nil {
-		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
-			"Failed to fetch inventory items", "database query failed", err)
-	}
-
-	// Group by Scryfall ID to fetch card data
-	scryfallIDs := make([]string, 0)
-	inventoryMap := make(map[string][]models.Inventory)
-
-	for _, item := range inventoryItems {
-		if _, exists := inventoryMap[item.ScryfallID]; !exists {
-			scryfallIDs = append(scryfallIDs, item.ScryfallID)
-		}
-		inventoryMap[item.ScryfallID] = append(inventoryMap[item.ScryfallID], item)
-	}
-
-	// Fetch and parse card data
-	scryfallCardMap, err := models.GetScryfallCardsByIDs(h.db.WithContext(c.RequestCtx()), scryfallIDs)
-	if err != nil {
-		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
-			"Failed to fetch card data", "cards query failed", err)
-	}
-
-	// Build enhanced card results using card data
-	enhancedResults := make([]EnhancedCardResult, 0, len(scryfallIDs))
-	for _, scryfallID := range scryfallIDs {
-		scryfallCard, found := scryfallCardMap[scryfallID]
-		if !found {
-			continue
-		}
-
-		enhancedCard := buildEnhancedCardResult(scryfallCard, inventoryMap[scryfallID])
-		enhancedResults = append(enhancedResults, enhancedCard)
-	}
-
-	// Back-fill prices for non-English printings from their English counterpart.
-	ptrs := make([]*CardResult, len(enhancedResults))
-	for i := range enhancedResults {
-		ptrs[i] = &enhancedResults[i].CardResult
-	}
-	BackfillEnglishPrices(h.db.WithContext(c.RequestCtx()), ptrs)
-
-	// Attach per-Oracle deck availability (owned / decked / free) to every card.
-	cards := make([]InventoryCard, len(enhancedResults))
-	for i := range enhancedResults {
-		cards[i] = InventoryCard{
-			EnhancedCardResult: enhancedResults[i],
-			Deck:               deckAvailability(availability, enhancedResults[i].OracleID),
-		}
-	}
-
-	// Calculate total pages
-	totalPages := utils.CalculateTotalPages(total, params.PageSize)
-
-	return c.JSON(InventoryCardsResponse{
-		Data:       cards,
-		Page:       params.Page,
-		PageSize:   params.PageSize,
-		TotalCards: int(total),
-		TotalPages: totalPages,
-	})
-}
-
-// ExistingPrintingInfo represents info about an existing printing in inventory
-// tygo:export
-type ExistingPrintingInfo struct {
-	ScryfallID      string                  `json:"scryfall_id"`
-	Treatment       string                  `json:"treatment"`
-	Quantity        int                     `json:"quantity"`
-	StorageLocation *models.StorageLocation `json:"storage_location,omitempty"`
-}
-
-// ByOracleResponse represents the response for checking existing printings
-// tygo:export
-type ByOracleResponse struct {
-	OracleID  string                   `json:"oracle_id"`
-	Printings []ExistingPrintingInfo   `json:"printings"`
-	Locations []models.StorageLocation `json:"locations"` // Unique locations where this card exists
-}
-
-// ByOracle returns inventory items for a given oracle ID
-func (h *InventoryHandler) ByOracle(c fiber.Ctx) error {
-	oracleID := c.Params("oracle_id")
-	if oracleID == "" {
-		return utils.ReturnError(c, fiber.StatusBadRequest, "oracle_id is required")
-	}
-
-	var items []models.Inventory
-	if err := h.db.WithContext(c.RequestCtx()).Preload("StorageLocation").
-		Where("oracle_id = ?", oracleID).
-		Find(&items).Error; err != nil {
-		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
-			"Failed to fetch inventory items", "database query failed", err)
-	}
-
-	// Build response with printings and unique locations
-	printings := make([]ExistingPrintingInfo, 0, len(items))
-	locationMap := make(map[uint]models.StorageLocation)
-
-	for _, item := range items {
-		printings = append(printings, ExistingPrintingInfo{
-			ScryfallID:      item.ScryfallID,
-			Treatment:       item.Treatment,
-			Quantity:        item.Quantity,
-			StorageLocation: item.StorageLocation,
-		})
-
-		if item.StorageLocation != nil {
-			locationMap[item.StorageLocation.ID] = *item.StorageLocation
-		}
-	}
-
-	// Convert location map to slice
-	locations := make([]models.StorageLocation, 0, len(locationMap))
-	for _, loc := range locationMap {
-		locations = append(locations, loc)
-	}
-
-	return c.JSON(ByOracleResponse{
-		OracleID:  oracleID,
-		Printings: printings,
-		Locations: locations,
-	})
 }
 
 // GetUnassignedCount returns the count of inventory items without a storage location
@@ -700,6 +522,9 @@ func sameLocation(a, b *uint) bool {
 	return *a == *b
 }
 
+// errQuantityExceedsStack: a split-move asked for more copies than the stack holds.
+var errQuantityExceedsStack = errors.New("quantity exceeds available stack")
+
 // SplitMove moves a chosen number of copies from a single inventory stack to another
 // storage location, leaving the remainder behind. If the destination already holds an
 // identical stack (same scryfall_id + treatment), the moved copies are merged into it
@@ -728,30 +553,6 @@ func (h *InventoryHandler) SplitMove(c fiber.Ctx) error {
 		return utils.ReturnError(c, fiber.StatusBadRequest, "quantity must be at least 1")
 	}
 
-	// A user-facing "stack" can be spread across multiple rows (the Create handler never
-	// merges, so each "+" adds a fresh row). All rows for a printing+treatment in one
-	// location form a single stack; sum their quantities to get the real available count.
-	siblingQuery := h.db.WithContext(c.RequestCtx()).
-		Where("scryfall_id = ? AND treatment = ?", source.ScryfallID, source.Treatment)
-	if source.StorageLocationID == nil {
-		siblingQuery = siblingQuery.Where("storage_location_id IS NULL")
-	} else {
-		siblingQuery = siblingQuery.Where("storage_location_id = ?", *source.StorageLocationID)
-	}
-	var siblings []models.Inventory
-	if err := siblingQuery.Find(&siblings).Error; err != nil {
-		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
-			"Failed to fetch inventory stack", "database query failed", err)
-	}
-	available := 0
-	for _, s := range siblings {
-		available += s.Quantity
-	}
-
-	if req.Quantity > available {
-		return utils.ReturnError(c, fiber.StatusBadRequest, "quantity exceeds available stack")
-	}
-
 	// Validate destination storage location exists if provided
 	if req.StorageLocationID != nil {
 		var location models.StorageLocation
@@ -770,37 +571,47 @@ func (h *InventoryHandler) SplitMove(c fiber.Ctx) error {
 
 	var dest models.Inventory
 	sourceDeleted := false
+	available := 0
 	err := h.db.WithContext(c.RequestCtx()).Transaction(func(tx *gorm.DB) error {
+		// Re-read the source and its stack inside the transaction, so two requests
+		// moving the same copies can't both pass the quantity check (transactions
+		// serialize: the database has one connection).
+		if err := tx.First(&source, source.ID).Error; err != nil {
+			return fmt.Errorf("reload source item: %w", err)
+		}
+
+		// A user-facing "stack" can be spread across several rows: all rows for a
+		// printing+treatment in one location form one stack, so its quantity is their sum.
+		var siblings []models.Inventory
+		if err := whereStack(tx, source.ScryfallID, source.Treatment, source.StorageLocationID).
+			Find(&siblings).Error; err != nil {
+			return fmt.Errorf("load source stack: %w", err)
+		}
+		available = 0
+		for _, s := range siblings {
+			available += s.Quantity
+		}
+		if req.Quantity > available {
+			return errQuantityExceedsStack
+		}
+
 		// Consolidate the source stack into the canonical row: delete the sibling rows so
 		// the remainder lands in a single tidy row. The destination location differs from
 		// the source location (guarded above), so this never touches the merge target.
-		consolidateQuery := tx.Where("scryfall_id = ? AND treatment = ? AND id <> ?",
-			source.ScryfallID, source.Treatment, source.ID)
-		if source.StorageLocationID == nil {
-			consolidateQuery = consolidateQuery.Where("storage_location_id IS NULL")
-		} else {
-			consolidateQuery = consolidateQuery.Where("storage_location_id = ?", *source.StorageLocationID)
-		}
-		if err := consolidateQuery.Delete(&models.Inventory{}).Error; err != nil {
-			return err
+		if err := whereStack(tx, source.ScryfallID, source.Treatment, source.StorageLocationID).
+			Where("id <> ?", source.ID).Delete(&models.Inventory{}).Error; err != nil {
+			return fmt.Errorf("consolidate source stack: %w", err)
 		}
 
 		// Find an identical stack at the destination to merge into (excluding the source row).
-		mergeQuery := tx.Where("scryfall_id = ? AND treatment = ? AND id <> ?",
-			source.ScryfallID, source.Treatment, source.ID)
-		if req.StorageLocationID == nil {
-			mergeQuery = mergeQuery.Where("storage_location_id IS NULL")
-		} else {
-			mergeQuery = mergeQuery.Where("storage_location_id = ?", *req.StorageLocationID)
-		}
-
-		mergeErr := mergeQuery.First(&dest).Error
+		mergeErr := whereStack(tx, source.ScryfallID, source.Treatment, req.StorageLocationID).
+			Where("id <> ?", source.ID).First(&dest).Error
 		switch {
 		case mergeErr == nil:
 			// Merge into the existing destination stack.
 			dest.Quantity += req.Quantity
 			if err := tx.Save(&dest).Error; err != nil {
-				return err
+				return fmt.Errorf("merge into destination stack: %w", err)
 			}
 		case errors.Is(mergeErr, gorm.ErrRecordNotFound):
 			// Create a new stack at the destination.
@@ -812,27 +623,33 @@ func (h *InventoryHandler) SplitMove(c fiber.Ctx) error {
 				StorageLocationID: req.StorageLocationID,
 			}
 			if err := tx.Create(&dest).Error; err != nil {
-				return err
+				return fmt.Errorf("create destination stack: %w", err)
 			}
 		default:
-			return mergeErr
+			return fmt.Errorf("find destination stack: %w", mergeErr)
 		}
 
 		// Set the consolidated source remainder, or delete the stack when fully moved.
 		if req.Quantity == available {
 			if err := tx.Delete(&source).Error; err != nil {
-				return err
+				return fmt.Errorf("delete moved source stack: %w", err)
 			}
 			sourceDeleted = true
 		} else {
 			source.Quantity = available - req.Quantity
 			if err := tx.Save(&source).Error; err != nil {
-				return err
+				return fmt.Errorf("update source remainder: %w", err)
 			}
 		}
 		return nil
 	})
-	if err != nil {
+	switch {
+	case errors.Is(err, errQuantityExceedsStack):
+		return utils.ReturnError(c, fiber.StatusBadRequest, "quantity exceeds available stack")
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		// Another request moved or deleted the source in the meantime.
+		return utils.ReturnError(c, fiber.StatusNotFound, "inventory item not found")
+	case err != nil:
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to move inventory copies", "split-move transaction failed", err)
 	}

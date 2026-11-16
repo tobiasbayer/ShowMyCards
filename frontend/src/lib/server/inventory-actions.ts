@@ -1,6 +1,5 @@
 /**
- * Shared server-side form action handlers for inventory add, update, and delete.
- * Used by search, import, inventory/[id], inventory/unassigned, and inventory/recent pages.
+ * Server-side form action handler for adding inventory, used by the import page.
  */
 import { BACKEND_URL } from '$lib';
 import { fail } from '@sveltejs/kit';
@@ -51,60 +50,5 @@ export async function handleAddInventory(request: Request, fetch: typeof globalT
 		return { success: true, action: 'add' as const, data: inventoryItem };
 	} catch {
 		return fail(500, { error: 'Failed to add to inventory' });
-	}
-}
-
-/**
- * Handle deleting an inventory item. Reads inventory_id from the form data.
- */
-export async function handleDeleteInventory(request: Request, fetch: typeof globalThis.fetch) {
-	const formData = await request.formData();
-	const inventoryId = formData.get('inventory_id');
-
-	if (!inventoryId) {
-		return fail(400, { error: 'Inventory ID is required' });
-	}
-
-	try {
-		const response = await fetch(`${BACKEND_URL}/api/inventory/${inventoryId}`, {
-			method: 'DELETE'
-		});
-
-		if (!response.ok) {
-			return fail(response.status, { error: 'Failed to delete inventory item' });
-		}
-
-		return { success: true, action: 'delete' as const };
-	} catch {
-		return fail(500, { error: 'Failed to delete inventory item' });
-	}
-}
-
-/**
- * Handle updating an inventory item's quantity. Reads inventory_id and quantity from the form data.
- */
-export async function handleUpdateInventory(request: Request, fetch: typeof globalThis.fetch) {
-	const formData = await request.formData();
-	const inventoryId = formData.get('inventory_id');
-	const quantity = formData.get('quantity');
-
-	if (!inventoryId || quantity === null) {
-		return fail(400, { error: 'Inventory ID and quantity are required' });
-	}
-
-	try {
-		const response = await fetch(`${BACKEND_URL}/api/inventory/${inventoryId}`, {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ quantity: parseInt(quantity.toString()) })
-		});
-
-		if (!response.ok) {
-			return fail(response.status, { error: 'Failed to update inventory item' });
-		}
-
-		return { success: true, action: 'update' as const };
-	} catch {
-		return fail(500, { error: 'Failed to update inventory item' });
 	}
 }

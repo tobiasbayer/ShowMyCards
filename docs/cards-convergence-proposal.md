@@ -2,6 +2,8 @@
 
 > **Where this file lives:** `docs/cards-convergence-proposal.md`, versioned on the `prototype/cards-page` branch. It started as an untracked note in `.scratch/` and moved on 2026-11-10.
 >
+> **Status (2026-11-13):** The Cards page is promoted to production on this branch: it lives at `/cards`, the old search page and its orphans are gone, and the prototype code was reworked to the review standards. See [Promotion (2026-11-13)](#promotion-2026-11-13) at the end, and "Where the work is" for the current files. The dated follow-up sections in between are history: their file paths are the prototype's (`routes/search/prototype/…`).
+>
 > **Status (2026-11-10):** The design below was validated with a throwaway UI prototype. The user's verdicts, the decisions they settled, and the facts found along the way are in [Prototype results](#prototype-results-2026-11-10) at the end of this file. Where they differ from the proposal, the prototype results win: they are the user's later decisions.
 
 ## Context (proposal)
@@ -259,42 +261,34 @@ This section records what the user decided while trying the prototype of the uni
 
 ## Where the work is
 
-- **Branch:** `prototype/cards-page`, created from `main`. The user commits only when asked. Commits so far:
-  - `8462802` "search prototype, split between collection and catalog": the two-tab version, plus the backend card-text fields.
-  - `c6ca00d` "merge collection and catalog view": the scope dropdown and search on Enter.
-  - `8eeda0a` "make prototype work with real data for further exploration": real writes, the backend additions, the default `/search` route and the Move menu.
-  - `6e5f78f` "docs: add proposal for card view convergence": this document.
-  - Not yet committed when written: the local search engine ("Local search engine" below).
-- **Run it:** `make dev-backend` and `make dev-frontend`, then open `http://localhost:5173/search`. On this branch `/search` **is** the Cards page, in dev and production builds alike, and `?variant=current` shows today's search page. A floating pill toggles between the two; ←/→ does the same when focus is not in an input.
+- **Branch:** `prototype/cards-page`, created from `main`. The user commits only when asked. The prototype commits (`8462802` … `66aed25`) are followed by the promotion commits of 2026-11-13; see "Promotion (2026-11-13)".
+- **Run it:** `make dev-backend` and `make dev-frontend`, then open `http://localhost:5173/cards`. The sidebar entry is "Cards"; the navbar search lands in its All cards scope.
 - **Writes are real** (since 2026-11-10; see "Usable on real data" below). Add copies with Undo, −/+, Move and Add to deck save to the backend.
 - **Losing variants:** the overlay-drawer and bottom-sheet variants were deleted before the first commit. A local, unversioned copy of all three variants, plus a patch of the tracked files at that point, is in `.scratch/cards-prototype-all-variants/` on the user's machine.
-- **Capture:** the `prototype` skill says to commit the full prototype to the throwaway branch, record the verdict, and fold only the validated decisions into `main`.
-  - The branch commits above capture the prototype.
-  - Folding the validated decisions into `main` is still pending; see "Suggested order".
+- **Folding into `main`** is still pending; see "Suggested order".
 
-### Prototype files (throwaway, except where marked)
+### Files
+
+Frontend, under `frontend/src/` (`cards/` is `lib/components/cards/`):
 
 | File | Role |
 |---|---|
-| `frontend/src/routes/search/prototype/state.svelte.ts` | `CardsView` (source, query, scope, selection, catalog paging, result counts, `forDecks()`), the `live` store of data re-read after writes, the write actions (`addCopy`, `removeCopy`, `undoAdd`, `moveStack`, `refreshCard`), and helpers such as `effectiveStacks`, `ownedCount`, `existingLocation` and `resolveAuto` |
-| `.../prototype/stacks.ts` (+ `stacks.test.ts`) | Pure helpers: `aggregateStacks`, `rowsOfStack`, `pickRowToDecrement` |
-| `.../prototype/MoveMenu.svelte` | The Move icon's DaisyUI dropdown of target locations; the selection bar reuses it with a label, opening upwards |
-| `.../prototype/SelectionBar.svelte` | The floating bar for checked tiles: Select all, Move to, Add to deck, Re-sort, Delete (with its confirmation dialog), Clear |
-| `.../prototype/CardsHeader.svelte` | Search input (applied on Enter), scope dropdown (All cards / My collection / locations / Unassigned), language dropdown, result counter |
-| `.../prototype/LanguageMenu.svelte` | The language dropdown: DaisyUI dropdown with Any language plus the Scryfall languages |
-| `.../prototype/language.ts` (+ `language.test.ts`) | Language rules: offered languages, each scope's default, which `?lang=` to keep |
-| `.../prototype/CardGrid.svelte` | Infinite-scroll grid |
-| `.../prototype/CardTile.svelte` | Tile: image, caption, deck badge, owned badge, hover "+" |
-| `.../prototype/AddPopover.svelte` | Add popover: finish buttons, destination picker, tally with Undo |
-| `.../prototype/CardPanel.svelte` | Detail panel; also holds the oracle-text parser (symbols, reminder text) |
-| `.../prototype/VariantPush.svelte` | The winning layout: grid plus a sticky 380px panel beside it |
-| `frontend/src/lib/components/PrototypeSwitcher.svelte` | Floating switcher between the Cards page and `?variant=current`. On this branch it ships in production builds too |
-| `frontend/src/routes/search/+page.server.ts` | `loadPrototype()`: Collection loads every owned printing; Catalog loads the first `/api/search` page; both build an oracle → deck-availability map from `/api/inventory/cards` |
-| `frontend/src/routes/search/+page.svelte` | Renders the prototype unless `?variant=current`, in which case it renders today's page (the large diff is mostly re-indentation) |
-| `frontend/src/lib/components/SearchControl.svelte` | In the prototype, the navbar search goes to the All cards scope (`source=catalog`) |
-| **Keep:** `backend/api/card_mapper.go`, `card_mapper_test.go`, `search.go`, `frontend/src/lib/types/api.ts`, `frontend/src/lib/utils/card-name.ts` | Real API additions; see "Backend changes" below |
-| **Keep:** `backend/api/inventory.go`, `inventory_merge_test.go`, `server/inventory_routes.go` | Create flags `merge`/`unassigned`, the auto-location preview and per-card availability; see "Usable on real data" below |
-| **Keep:** `backend/cardquery/` (+ tests, `testdata/`), `backend/api/collection_search.go` (+ test), the guard in `backend/api/search.go`, `backend/cmd/querycompare/` | The local Scryfall-syntax engine, `GET /api/inventory/search`, and the comparison tool; see "Local search engine" below |
+| `routes/cards/+page.server.ts` (+ `server.test.ts`) | `loadCards()`: collection scopes call `/api/inventory/search`, All cards the first `/api/search` page; adds the picked language and price order; turns 400s into `queryError` |
+| `routes/cards/+page.svelte` | Renders `CardsPage`, keyed on the load's data |
+| `cards/CardsPage.svelte` | Layout: header, grid and the 380px detail panel (beside the grid from `md`, full-screen below), Esc order |
+| `cards/view.svelte.ts` (+ test) | `CardsView`: source, query, scope, language, sort, checked tiles, open card, paging and "load more" with Retry, `navigate()` |
+| `cards/live.svelte.ts` | `live` (rows and availability re-read after writes), `ui.openPopovers` and `countOpen` for the Esc order |
+| `cards/owned.ts` | What a card's copies show: `effectiveStacks`, `ownedCount`, `scopeRows`, `existingLocation`, `locationName` |
+| `cards/writes.ts` (+ `writes.svelte.test.ts`) | The per-card write queue, single-card actions (`addCopy`, `removeCopy`, `undoAdd`, `moveStack`), bulk actions (`moveCopies`, `deleteCopies`, `resortCopies`), `resolveAuto` |
+| `cards/stacks.ts`, `catalog.ts`, `language.ts`, `sort.ts`, `format.ts`, `printings.ts` (+ tests) | Pure helpers: stack rows, the All cards search params, language and sort rules, wording, the panel's printings cache |
+| `cards/CardsHeader.svelte`, `ScopeMenu`, `LanguageMenu`, `SortMenu`, `SearchBuilder` | The header: search field with the builder popover, scope, language and sort menus, counter |
+| `cards/CardGrid.svelte`, `CardTile`, `CardPanel`, `AddPopover`, `MoveMenu`, `SelectionBar` (+ specs) | Grid, tile, detail panel, Add popover, Move menu, selection bar |
+| `cards/test-fixtures.ts` | Cards, rows, locations, a view and a fake backend for the tests |
+| `lib/components/Dropdown.svelte` (+ spec) | The shared DaisyUI `<details>` dropdown (no OS menus): Esc and outside clicks close only the menu |
+| `lib/components/AddToDeckModal.svelte`, `DeckField.svelte`, `deck-choice.svelte.ts` | The Add to deck dialog and its deck picker |
+| `lib/utils/oracle-text.ts` (+ test) | The panel's card-text parser (symbols, reminder text, faces) |
+
+Backend: `backend/cardquery/` (+ tests, `testdata/`), `backend/api/collection_search.go`, `backend/api/search.go` (collection-keyword guard; per-printing `deck.printings` on results), `backend/api/inventory.go` (Create's `merge`/`unassigned`, `auto-location`, `availability`, SplitMove), `backend/services/allocation.go`, `backend/api/card_mapper.go`, and the manual tool `backend/cmd/querycompare/`.
 
 ## Decisions the user settled
 
@@ -592,7 +586,7 @@ The user owns seven Sol Rings over six printings, with all but one in decks. Sea
   - **Unchanged:** deck pages, the Add-to-deck notice and the per-card `owned`/`decked`/`free`.
 - **Any-printing slots stay vague.** If six decks want "Sol Ring, any printing", every printing shows 1, which is true. Only pinned slots single out a printing.
 - **Pin by default:** Add to deck starts with "Pin this printing" ticked when every card being added is an owned printing (Cards page panel and multi-select; `pinByDefault` on `AddToDeckModal`). In All cards an unowned printing stays unticked, because pinning it would count the card missing although another printing is owned. The old `CardResultCard` is unchanged.
-- **Backend:** `AvailabilityMap.PrintingFree` / `PrintingsFree` in `services/allocation.go`; `DeckAvailability.printings` (scryfall_id → free, optional) on `/inventory/search`, `/inventory/cards` and `/inventory/availability/:oracle_id`. The post-write refresh re-reads the last one, so every printing's tile of the card updates.
+- **Backend:** `AvailabilityMap.PrintingFree` / `PrintingsFree` in `services/allocation.go`; `DeckAvailability.printings` (scryfall_id → free, optional) on `/inventory/search`, `/inventory/cards` and `/inventory/availability/:oracle_id` (since the promotion also on `/api/search`; `/inventory/cards` is removed). The post-write refresh re-reads the last one, so every printing's tile of the card updates.
 - **Follow-up, not done:** a way to pin an existing deck slot to a printing on the deck page. Until then, remove the slot and add it again from the printing's tile.
 
 ### Follow-up: language dropdown (2026-11-13)
@@ -747,9 +741,9 @@ Other Scryfall errors in All cards show "Scryfall couldn't read this search" (or
 
 ### API and code
 - **Ignored `unique=` parameter:** `/api/search` ignores a `unique=` query parameter and reads the unique mode from settings (`backend/api/search.go`). The `unique:prints` keyword inside `q` works, and both `oracleid:` and `oracle_id:` are valid Scryfall syntax. This is why "Other printings" on today's `/cards/[id]` page is incomplete: it sends `&unique=prints`.
-- **Deck availability exists only on inventory results.** `InventoryCard.deck {owned, decked, free}` is per card (oracle), finish-blind, and computed by `services/allocation.go`. Since 2026-11-13 it also carries `printings` (free copies per owned printing). Only `/api/inventory/cards` serves it; search results do not, so the prototype builds an oracle → availability map from the full collection.
+- **Deck availability exists only on inventory results.** `InventoryCard.deck {owned, decked, free}` is per card (oracle), finish-blind, and computed by `services/allocation.go`. Since 2026-11-13 it also carries `printings` (free copies per owned printing). Only `/api/inventory/cards` serves it; search results do not, so the prototype builds an oracle → availability map from the full collection. *(Changed 2026-11-13: `/api/search` results carry it, `printings` included, and `/api/inventory/cards` is removed.)*
 - **A mistyped helper causes the existing type errors.** `fetchAllInventoryCards` (`frontend/src/lib/server/inventory-cards.ts`) returns `InventoryCard`s at runtime but is typed `EnhancedCardResult[]`. That mismatch is the source of the 16 svelte-check errors already on `main`, as is the `InventoryBrowser.svelte.spec.ts` fixtures lacking `deck` (6 failing tests on `main`).
-- **The inventory endpoint returns duplicates across pages.** On a real collection, `/api/inventory/cards` returned about 27% more entries across pages (`page_size=200`) than there were unique printings. This confirms the proposal's point that it pages by inventory rows. `fetchAllInventoryCards` hides it by merging on card ID.
+- **The inventory endpoint returns duplicates across pages.** On a real collection, `/api/inventory/cards` returned about 27% more entries across pages (`page_size=200`) than there were unique printings. This confirms the proposal's point that it pages by inventory rows. `fetchAllInventoryCards` hides it by merging on card ID. *(Both are removed since 2026-11-13.)*
 - **Fixed: the Auto-rule preview could differ from the real auto-sort.** The first preview called `POST /api/sorting-rules/evaluate` with `CardResult`-shaped data, like `RuleTester`, so rules on fields `CardResult` lacks (rarity, type line and so on) could resolve differently from the real auto-sort, which reads the full local card JSON. `RuleTester` still has this gap. The prototype now uses `GET /api/inventory/auto-location` (see "Usable on real data").
 - **SvelteKit shallow routing:** shallow `replaceState` from `$app/navigation` does **not** update `page.url`, so URL builders must read `window.location`.
 - **Mana font:** `manaSymbolClasses()` (`frontend/src/lib/utils/mana.ts`) is built for mana costs and maps `{T}` to `ms-t`, which does not exist. The bundled CSS (`src/lib/styles/mana.css`) has `ms-tap` and `ms-untap`. The panel maps {T} and {Q} itself.
@@ -778,19 +772,64 @@ Other Scryfall errors in All cards show "Scryfall couldn't read this search" (or
 - **"In decks" section:** should it also show the free and committed counts? Not requested yet.
 - **Image format:** consider a larger Scryfall image format now that tiles are bigger.
 - **Face rule:** the rule between faces in the panel text is faint in the dark theme.
-- **Collection queries on today's inventory pages:** the endpoint could replace `fetchAllInventoryCards` and the name/set filter box there (proposal step 2). Not wired yet, by the user's choice.
-- **The scope dropdown in the header is still a native `<select>`,** so it opens the OS menu the user disliked for Move. Switch it to the DaisyUI dropdown too?
-- **The Add-to-deck dialog's deck picker is also a native `<select>`** (`AddToDeckModal.svelte`), with the same objection.
-- **Duplicate location names:** locations can share a name (for example a binder and a box both called "A1"), and the Move menu, the scope dropdown and the Add popover can't tell them apart. The older `StorageLocationDropdown` prefixes 📖 (binder) or 📦 (box). Show the storage type, or require unique names?
+- ~~**Collection queries on today's inventory pages.**~~ Moot since 2026-11-13: those pages are gone; `/inventory` only links to the Cards page.
+- ~~**The scope dropdown in the header is still a native `<select>`.**~~ Done 2026-11-13: the shared `Dropdown`.
+- ~~**The Add-to-deck dialog's deck picker is also a native `<select>`.**~~ Done 2026-11-13: the shared `Dropdown`.
+- **Price order in other languages (All cards):** Scryfall orders by its own prices, which localized printings lack; the English prices shown on their tiles are filled in afterwards. So "Price: highest first" in German can show $0.06 above $1.17. Seen 2026-11-13; not fixed.
+- **Duplicate location names** (left open again on 2026-11-13): locations can share a name (for example a binder and a box both called "A1"), and the Move menu, the scope dropdown and the Add popover can't tell them apart. The older `StorageLocationDropdown` prefixes 📖 (binder) or 📦 (box). Show the storage type, or require unique names?
 
 ## Tooling notes for this environment
 
+- **Browser tests and Chrome in the sandbox:** Vitest's headless Chromium can't start inside the sandbox (its Mach-port check-in is denied), even with `allowLocalBinding`; run `bunx vitest run --project client` outside it.
 - **Sandbox limits:** the sandbox blocks binding local ports (Go `httptest` servers, Vitest browser tests), the golangci-lint cache, localhost connections from scripts, and `go run github.com/gzuidhof/tygo@latest` (TLS through the proxy). Those commands were run outside the sandbox. `sandbox.network.allowLocalBinding: true` fixes the port-binding part.
 - **Testing dropdowns:** check them with real clicks. Setting a `<select>` value and dispatching `change` from a script skips opening the menu, and with it the focus and blur that broke the first Move menu. Browser automation also cannot click inside an OS-native select menu; that is one more reason to prefer DOM-based DaisyUI dropdowns.
 - **DaisyUI `<details>` dropdowns: no `tabindex` on the `<summary>`.** DaisyUI's `.dropdown:focus-within > [tabindex]:first-child { pointer-events: none }` switches off its pointer events as soon as the click focuses it, so the click never toggles the menu. A summary is focusable without one. This broke the first language dropdown (2026-11-13).
 - **Testing writes safely:** copy the database with `sqlite3 backend/data/database.db ".backup <scratch>/e2e.db"` (about 10 s for 3.8 GB). Then run a second backend with `DATABASE_PATH=<scratch>/e2e.db DATA_DIR=<scratch>/e2e-data PORT=3100 go run .` and a frontend against it with `PUBLIC_BACKEND_URL=http://localhost:3100 bun run dev --port 5174`. Never test writes against the user's dev database.
+- **Baseline on this branch (2026-11-13):** svelte-check 0 errors and 1 warning (missing `node` types); eslint and prettier clean; every Vitest test passes; golangci-lint 58 findings repo-wide (`errcheck`/`staticcheck`, none in the Cards page's files).
 - **Baseline on `main`, so you don't chase it:**
   - svelte-check: 16 errors and 1 warning (missing `node` types).
   - Vitest: 6 failing `InventoryBrowser.svelte.spec.ts` tests.
   - golangci-lint on `./api/...`: 12 `errcheck` findings, all in test files.
   - gofmt: several files are unformatted (`api/data.go`, `api/storage.go`, some tests).
+
+# Promotion (2026-11-13)
+
+The user asked to promote the Cards page to production on this branch: delete the old search and every orphan it leaves, drop the prototype wording, and make the result production-grade. A grilling session settled the decisions below; the work followed in focused commits (`7dbcc08` … `d318130`).
+
+## Decisions
+
+| # | Decision |
+|---|---|
+| 1 | The page moves to **`/cards`**; `/search` is deleted with **no redirect**. `/cards/[id]` stays. |
+| 2 | "Did you mean" suggestions are dropped. |
+| 3 | Orphans go in **frontend and backend** (endpoints, handlers, client methods, tests, generated types). |
+| 4 | Production-grade means: prototype names and comments gone; a review-standards pass with every MUST FIX and SHOULD FIX fixed; test gaps filled; no native selects. |
+| 5 | Components, state and helpers live in `$lib/components/cards/`. |
+| 6 | Small screens: the panel sits beside the grid from `md`, covers the page below it; on touch screens the tile's "+" and checkmark are always shown. |
+| 7 | URL parameters are unchanged (`source`, `location`, `q`, `lang`, `sort`). |
+| 8 | Logical commits: additive backend first, then the frontend stops using things, then backend removals. |
+| 9 | `/inventory/recent` is retired: My collection is newest first. Its old tile (`CardResultCard`) goes with it. |
+| 10 | All cards' deck badges come from `/api/search`'s own `deck` field (now with `printings`); the whole-collection fetch goes. |
+| 11 | Older dead code (the rest of `card-collection/`, `searchApi`, unused `inventoryApi` methods) stays… |
+| 12 | Duplicate location names stay an open question. |
+| 13 | …except what would break: `CardCollection`, `GridView`, `TableView`, `PageSizeSelector` and `CardPreview` are deleted. |
+| 14 | Sidebar entry "Cards" with the `GalleryVerticalEnd` icon; page title "Cards". No navigation regroup yet (§7). |
+| 15 | This document is appended to and its stale facts fixed; both CLAUDE.md files are updated. |
+| 16 | One shared `Dropdown` for the language, sort, Move, scope and deck menus. |
+| 17 | Browser tests and the end-to-end check run with local ports allowed. |
+| 18 | The hover keyboard shortcuts (Alt+1/2 on the old tile) are dropped, with the keyboard store and the `?` help overlay. |
+| 19 | The rule-match sound is dropped, with its settings. |
+
+## What changed
+
+- **Removed (frontend):** the old search page and `?variant=current`, `PrototypeSwitcher`, `SearchBuilderModal`, `/inventory/recent`, `CardResultCard`, `PrintingConflictModal`, the selection and keyboard stores, `KeyboardShortcutsHelp`, `audio.ts` and the sounds, `fetchAllInventoryCards`, the update/delete inventory form actions, the card-collection views listed above.
+- **Removed (backend):** `GET /api/search/autocomplete` (and the Scryfall client's autocomplete), `GET /api/inventory/cards`, `GET /api/inventory/by-oracle/:oracle_id`, their types and tests.
+- **Added (backend):** `deck.printings` on `/api/search` results; sentinel errors `services.ErrCardNotInCatalog` and `rules.ErrNoMatchingRule`, so `auto-location` returns 500 on a real failure instead of "no location".
+- **Fixed by the review pass:** a SplitMove race that could duplicate copies on a double click (the stack is now re-read and checked inside the transaction); `order:`/`direction:` under `-` or `or` now an error instead of matching nothing or everything; Esc in the panel's Add to deck dialog closed the panel; quotes in the search builder's name and type; "1selected" in the selection bar; a tooltip that made the page scroll sideways; silent failures (load more, the panel's decks and printings, a re-read after a save, the Auto preview) now shown with Retry or a warning; muted text raised to WCAG AA in light and dark themes; module state no longer written during SSR.
+- **Restructured:** the 680-line state module split into `view`, `live`, `owned` and `writes`; the oracle parser and the printings cache moved out of the panel; the deck picker moved out of `AddToDeckModal`; all calls go through `$lib/api`.
+
+## Verified
+
+- Backend: `go test ./...` passes; `go vet` clean; golangci-lint at its baseline. Frontend: svelte-check 0 errors, eslint and prettier clean, 371 server-side and 80 browser tests pass.
+- In Chrome against a copy of the real database (backend on 3100, frontend on 5174), with real clicks: the scope dropdown and a location scope; the Esc order deck menu → dialog → panel; navbar search into All cards; per-printing deck badges from the search results (three owned Sol Ring printings), with no call to a removed endpoint; "load more" up to all 504 `t:goblin` results; add, Undo and "−" saved to the database; at 606px the panel covers the page with no sideways scroll, at 820px it sits beside a one-column grid; `/search` and `/inventory/recent` are 404s; Settings shows only the currency; the sidebar, dashboard, inventory and storage links open the right scopes; the light theme; no console errors.
+- Not verified: touch devices (the always-visible controls rely on `pointer: coarse`, which desktop Chrome doesn't emulate here).

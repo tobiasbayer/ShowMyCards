@@ -46,25 +46,31 @@ function numericTerms(p: SearchBuilderParams, keywords: Record<string, string>):
 	return parts;
 }
 
+/**
+ * `keyword:value`, quoted when the value has spaces or parentheses; '' when the
+ * value is empty. Scryfall can't escape a `"` inside quotes, so those are dropped.
+ */
+function textTerm(keyword: string, raw: string): string {
+	const value = raw.replace(/"/g, '').trim();
+	if (!value) return '';
+	return /[\s()]/.test(value) ? `${keyword}:"${value}"` : `${keyword}:${value}`;
+}
+
 export function buildSearchQuery(
 	p: SearchBuilderParams,
 	{ collection = false }: SearchBuilderOptions = {}
 ): string {
 	const parts: string[] = [];
 
-	if (p.cardName.trim()) {
-		const n = p.cardName.trim();
-		parts.push(n.includes(' ') ? `name:"${n}"` : `name:${n}`);
-	}
+	const name = textTerm('name', p.cardName);
+	if (name) parts.push(name);
 
 	if (p.setCode.trim()) {
 		parts.push(`s:${p.setCode.trim()}`);
 	}
 
-	if (p.cardType.trim()) {
-		const t = p.cardType.trim();
-		parts.push(t.includes(' ') ? `t:"${t}"` : `t:${t}`);
-	}
+	const type = textTerm('t', p.cardType);
+	if (type) parts.push(type);
 
 	if (p.colors.size > 0) {
 		const selected = COLOR_ORDER.filter((c) => p.colors.has(c));

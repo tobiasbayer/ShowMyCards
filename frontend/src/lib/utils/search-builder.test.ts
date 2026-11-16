@@ -50,6 +50,23 @@ describe('buildSearchQuery', () => {
 		});
 	});
 
+	describe('quoting', () => {
+		it('drops double quotes, which Scryfall cannot escape inside quotes', () => {
+			expect(buildSearchQuery(params({ cardName: 'Kongming, "Sleeping Dragon"' }))).toBe(
+				'name:"Kongming, Sleeping Dragon"'
+			);
+			expect(buildSearchQuery(params({ cardType: '"Legendary"' }))).toBe('t:Legendary');
+		});
+
+		it('quotes a value with parentheses', () => {
+			expect(buildSearchQuery(params({ cardName: 'Who(?)' }))).toBe('name:"Who(?)"');
+		});
+
+		it('leaves out a field that held only quotes', () => {
+			expect(buildSearchQuery(params({ cardName: '""', setCode: 'blb' }))).toBe('s:blb');
+		});
+	});
+
 	describe('card type', () => {
 		it('single word uses bare t: syntax', () => {
 			expect(buildSearchQuery(params({ cardType: 'Creature' }))).toBe('t:Creature');

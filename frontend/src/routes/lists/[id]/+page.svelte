@@ -233,7 +233,6 @@
 							onSearchChange={handleSearchChange}
 							{statusFilter}
 							onStatusChange={handleStatusChange}
-							showStatusFilter={true}
 							placeholder="Filter by name, set, or treatment..." />
 						<ViewToggle viewMode={view.viewMode} onViewModeChange={view.setViewMode} />
 					</div>

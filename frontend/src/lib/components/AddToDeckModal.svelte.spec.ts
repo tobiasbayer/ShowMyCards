@@ -1,4 +1,4 @@
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import { notifications, type DeckAvailability, type DeckCardUsage, type DeckSummary } from '$lib';
@@ -65,6 +65,12 @@ function usage(deckId: number, deckName: string): DeckCardUsage {
 	};
 }
 
+/** Opens the deck dropdown and picks a deck by name. */
+async function pickDeck(name: string) {
+	await page.getByLabelText('Deck', { exact: true }).click();
+	await page.getByRole('button', { name, exact: true }).click();
+}
+
 function requested(fragment: string) {
 	return fetchSpy.mock.calls.some(([input]) => String(input).includes(fragment));
 }
@@ -85,7 +91,7 @@ describe('AddToDeckModal', () => {
 		const onClose = vi.fn();
 		render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose });
 
-		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
+		await pickDeck('Elves');
 		await page.getByRole('radio', { name: 'Side' }).click();
 		await page.getByLabelText('Quantity').fill('2');
 		await page.getByRole('button', { name: 'Add to deck' }).click();
@@ -163,7 +169,7 @@ describe('AddToDeckModal', () => {
 		const onAdded = vi.fn();
 		render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose: vi.fn() });
 
-		await expect.element(page.getByLabelText('Deck', { exact: true })).toHaveValue('9');
+		await expect.element(page.getByLabelText('Deck', { exact: true })).toHaveTextContent('Elves');
 		await page.getByRole('button', { name: 'New' }).click();
 		await page.getByPlaceholder('New deck name').fill('Burn');
 		await page.getByRole('button', { name: 'Add to deck' }).click();
@@ -178,7 +184,7 @@ describe('AddToDeckModal', () => {
 		mockBackend([deck(7, 'Mono Red'), deck(9, 'Elves')]);
 		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
-		await expect.element(page.getByLabelText('Deck', { exact: true })).toHaveValue('9');
+		await expect.element(page.getByLabelText('Deck', { exact: true })).toHaveTextContent('Elves');
 		await page.getByRole('button', { name: 'New' }).click();
 
 		await expect.element(page.getByRole('button', { name: 'Add to deck' })).toBeDisabled();
@@ -189,7 +195,7 @@ describe('AddToDeckModal', () => {
 		mockBackend([deck(7, 'Mono Red'), deck(9, 'Elves')]);
 		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
-		await expect.element(page.getByLabelText('Deck', { exact: true })).toHaveValue('9');
+		await expect.element(page.getByLabelText('Deck', { exact: true })).toHaveTextContent('Elves');
 	});
 
 	it('offers a copies toggle in bulk mode and adds one of each', async () => {
@@ -254,7 +260,7 @@ describe('AddToDeckModal shared-copy notice', () => {
 		mockBackend(decks, oneCopyInMonoRed);
 		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
-		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
+		await pickDeck('Elves');
 
 		await expect.element(page.getByText(notice)).toBeInTheDocument();
 	});
@@ -263,10 +269,10 @@ describe('AddToDeckModal shared-copy notice', () => {
 		mockBackend(decks, oneCopyInMonoRed);
 		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
-		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
+		await pickDeck('Elves');
 		await expect.element(page.getByText(notice)).toBeInTheDocument();
 
-		await page.getByLabelText('Deck', { exact: true }).selectOptions('7');
+		await pickDeck('Mono Red');
 		await expect.element(page.getByText(notice)).not.toBeInTheDocument();
 	});
 
@@ -274,7 +280,7 @@ describe('AddToDeckModal shared-copy notice', () => {
 		mockBackend(decks, oneCopyInMonoRed);
 		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
-		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
+		await pickDeck('Elves');
 		await expect.element(page.getByText(notice)).toBeInTheDocument();
 
 		await page.getByRole('radio', { name: 'Maybe' }).click();
@@ -291,7 +297,7 @@ describe('AddToDeckModal shared-copy notice', () => {
 		});
 		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
-		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
+		await pickDeck('Elves');
 		await vi.waitFor(() => expect(requested('/for-card/')).toBe(true));
 
 		await expect.element(page.getByText(/already in/)).not.toBeInTheDocument();
@@ -316,7 +322,7 @@ describe('AddToDeckModal shared-copy notice', () => {
 		const onAdded = vi.fn();
 		render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose: vi.fn() });
 
-		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
+		await pickDeck('Elves');
 		await expect.element(page.getByText(notice)).toBeInTheDocument();
 		await page.getByRole('button', { name: 'Add to deck' }).click();
 
@@ -335,11 +341,50 @@ describe('AddToDeckModal shared-copy notice', () => {
 		const onAdded = vi.fn();
 		render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose: vi.fn() });
 
-		await page.getByLabelText('Deck', { exact: true }).selectOptions('9');
+		await pickDeck('Elves');
 		await vi.waitFor(() => expect(requested('/for-card/')).toBe(true));
 		await page.getByRole('button', { name: 'Add to deck' }).click();
 
 		await vi.waitFor(() => expect(onAdded).toHaveBeenCalledWith('Elves'));
 		expect(notifications.notifications.at(-1)?.type).toBe('success');
+	});
+});
+
+describe('AddToDeckModal keyboard', () => {
+	afterEach(() => vi.restoreAllMocks());
+
+	it('closes on Esc', async () => {
+		mockBackend([deck(7, 'Mono Red')]);
+		const onClose = vi.fn();
+		render(AddToDeckModal, { open: true, cards: [sol], onClose });
+
+		await expect.element(page.getByLabelText('Deck', { exact: true })).toBeInTheDocument();
+		await userEvent.keyboard('{Escape}');
+
+		expect(onClose).toHaveBeenCalledOnce();
+	});
+
+	it('only cancels "New" on Esc in the deck name', async () => {
+		mockBackend([deck(7, 'Mono Red')]);
+		const onClose = vi.fn();
+		render(AddToDeckModal, { open: true, cards: [sol], onClose });
+
+		await page.getByRole('button', { name: 'New' }).click();
+		await page.getByPlaceholder('New deck name').click();
+		await userEvent.keyboard('{Escape}');
+
+		await expect.element(page.getByPlaceholder('New deck name')).not.toBeInTheDocument();
+		expect(onClose).not.toHaveBeenCalled();
+	});
+
+	it('only closes the deck menu on Esc while it is open', async () => {
+		mockBackend([deck(7, 'Mono Red'), deck(9, 'Elves')]);
+		const onClose = vi.fn();
+		render(AddToDeckModal, { open: true, cards: [sol], onClose });
+
+		await page.getByLabelText('Deck', { exact: true }).click();
+		await userEvent.keyboard('{Escape}');
+
+		expect(onClose).not.toHaveBeenCalled();
 	});
 });

@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { DeckCardUsage, DeckSummary, CreateDeckRequest } from '$lib';
+import type { CreateDeckItemRequest, CreateDeckRequest, DeckCardUsage, DeckSummary } from '$lib';
 
 /** A deck as returned by create (BaseModel fields flattened at runtime). */
 export interface CreatedDeck {
@@ -9,10 +9,9 @@ export interface CreatedDeck {
 }
 
 /**
- * Decks API methods (client-side reads and deck creation via the /api proxy).
- *
- * Adding cards to a deck goes through the SvelteKit route
- * `POST /decks/[id]/items` instead, which runs the shared server-side upsert.
+ * Decks API methods: reads and deck creation via the /api proxy, and adding
+ * cards through the SvelteKit route `POST /decks/[id]/items`, which runs the
+ * shared server-side upsert.
  */
 export const decksApi = {
 	/** List all decks with summary statistics. */
@@ -23,5 +22,21 @@ export const decksApi = {
 
 	/** Every deck item that uses a printing: any-printing items and items pinned to it. */
 	forCard: (scryfallId: string) =>
-		apiClient.get<DeckCardUsage[]>(`/decks/for-card/${encodeURIComponent(scryfallId)}`)
+		apiClient.get<DeckCardUsage[]>(`/decks/for-card/${encodeURIComponent(scryfallId)}`),
+
+	/**
+	 * Add cards to a deck; a card already in it gets its quantity raised. Throws
+	 * with the route's message when that fails.
+	 */
+	addItems: async (deckId: number, items: CreateDeckItemRequest[]): Promise<void> => {
+		const response = await fetch(`/decks/${deckId}/items`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ items })
+		});
+		if (!response.ok) {
+			const body = (await response.json().catch(() => ({}))) as { error?: string };
+			throw new Error(body.error ?? 'Failed to add to deck');
+		}
+	}
 };

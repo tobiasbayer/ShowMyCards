@@ -103,7 +103,7 @@
 
 	<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
 		<a
-			href={resolve('/search')}
+			href={resolve('/cards?source=catalog')}
 			class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">
@@ -127,14 +127,14 @@
 		</a>
 
 		<a
-			href={resolve('/inventory/recent')}
+			href={resolve('/cards')}
 			class="card bg-base-200 shadow-lg hover:shadow-xl transition-shadow">
 			<div class="card-body">
 				<h2 class="card-title">
 					<History class="h-6 w-6" />
 					Recently Added
 				</h2>
-				<p class="text-sm opacity-70">Quick access to recent cards</p>
+				<p class="text-sm opacity-70">Your collection, newest first</p>
 			</div>
 		</a>
 

@@ -9,9 +9,6 @@ export type { ScryfallLanguage } from './constants';
 // Stores
 export { notifications } from './stores/notifications.svelte';
 export type { NotificationMessage } from './stores/notifications.svelte';
-export { keyboard } from './stores/keyboard.svelte';
-export type { CardActions, KeyboardShortcut } from './stores/keyboard.svelte';
-export { selection } from './stores/selection.svelte';
 export { currency } from './stores/currency.svelte';
 export type { Currency } from './stores/currency.svelte';
 
@@ -39,7 +36,6 @@ export { useRuleCrud } from './composables/useRuleCrud.svelte';
 export { usePersistedViewMode } from './composables/usePersistedViewMode.svelte';
 
 // Components
-export { default as CardResultCard } from './components/CardResultCard.svelte';
 export { default as Lozenge } from './components/Lozenge.svelte';
 export { default as Notification } from './components/Notification.svelte';
 export { default as NotificationContainer } from './components/NotificationContainer.svelte';
@@ -72,26 +68,18 @@ export { default as ListCardTable } from './components/ListCardTable.svelte';
 export { default as ListSearchResults } from './components/ListSearchResults.svelte';
 export { default as StorageLocationRow } from './components/StorageLocationRow.svelte';
 export { default as StorageLocationDropdown } from './components/StorageLocationDropdown.svelte';
-export { default as KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp.svelte';
 export { default as ResortModal } from './components/ResortModal.svelte';
-export { default as PrintingConflictModal } from './components/PrintingConflictModal.svelte';
-export { default as SearchBuilderModal } from './components/SearchBuilderModal.svelte';
 export { default as SetCombobox } from './components/SetCombobox.svelte';
 export { default as CardImage } from './components/CardImage.svelte';
-export { default as CardPreview } from './components/CardPreview.svelte';
 export { default as TreatmentBadge } from './components/TreatmentBadge.svelte';
 // Banners is the layout-level banner host. The presentational Banner.svelte is
 // not re-exported: its name would collide with the Banner type below, and only
 // Banners (and a future component preview) need it.
 export { default as Banners } from './components/Banners.svelte';
 
-// Card Collection (unified multi-view component)
+// Card Collection: view and filter controls, adapters and types
 export {
-	CardCollection,
-	GridView,
-	TableView,
 	ViewToggle,
-	PageSizeSelector,
 	CardFilter,
 	adaptInventoryCards,
 	adaptSearchResults,
@@ -101,14 +89,7 @@ export {
 	fromListItem,
 	isFoilTreatment
 } from './components/card-collection';
-export type {
-	ViewMode,
-	CardSourceType,
-	DisplayableCard,
-	PaginationState,
-	TableColumn,
-	CardCollectionProps
-} from './components/card-collection';
+export type { ViewMode, CardSourceType, DisplayableCard } from './components/card-collection';
 
 // Re-export generated types from Go backend models
 export type { BaseModel, StorageType, JobType, JobStatus, Card, Banner } from './types/models';
@@ -152,7 +133,6 @@ export type {
 	EvaluateResponse,
 	EvaluateRequest,
 	StorageLocationWithCount,
-	InventoryCardsResponse,
 	InventoryCard,
 	DeckAvailability,
 	CollectionSearchResponse,
@@ -203,7 +183,6 @@ export {
 export type { SetSortable } from './utils/sort-cards';
 export { getUniqueTreatments, groupCardsByTreatment } from './utils/search-results';
 export type { CardWithTreatment, GroupedCardsResult } from './utils/search-results';
-export { audio } from './utils/audio';
 export { getActionError, getActionMessage } from './utils/form-actions';
 export { scryfallImageUrl } from './utils/scryfall-image';
 export { buildDeckItems } from './utils/deck-add';

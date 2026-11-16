@@ -10,8 +10,6 @@
 		statusFilter?: 'all' | 'collected' | 'uncollected';
 		/** Callback when status filter changes */
 		onStatusChange?: (status: 'all' | 'collected' | 'uncollected') => void;
-		/** Show status filter buttons */
-		showStatusFilter?: boolean;
 		/** Placeholder text for search input */
 		placeholder?: string;
 	}
@@ -21,7 +19,6 @@
 		onSearchChange,
 		statusFilter = 'all',
 		onStatusChange,
-		showStatusFilter = true,
 		placeholder = 'Filter by name, set, or treatment...'
 	}: Props = $props();
 
@@ -70,29 +67,27 @@
 	</div>
 
 	<!-- Status filter buttons -->
-	{#if showStatusFilter}
-		<div class="join">
-			<button
-				type="button"
-				class="join-item btn btn-sm"
-				class:btn-active={statusFilter === 'all'}
-				onclick={() => handleStatusClick('all')}>
-				All
-			</button>
-			<button
-				type="button"
-				class="join-item btn btn-sm"
-				class:btn-active={statusFilter === 'collected'}
-				onclick={() => handleStatusClick('collected')}>
-				Collected
-			</button>
-			<button
-				type="button"
-				class="join-item btn btn-sm"
-				class:btn-active={statusFilter === 'uncollected'}
-				onclick={() => handleStatusClick('uncollected')}>
-				Need
-			</button>
-		</div>
-	{/if}
+	<div class="join">
+		<button
+			type="button"
+			class="join-item btn btn-sm"
+			class:btn-active={statusFilter === 'all'}
+			onclick={() => handleStatusClick('all')}>
+			All
+		</button>
+		<button
+			type="button"
+			class="join-item btn btn-sm"
+			class:btn-active={statusFilter === 'collected'}
+			onclick={() => handleStatusClick('collected')}>
+			Collected
+		</button>
+		<button
+			type="button"
+			class="join-item btn btn-sm"
+			class:btn-active={statusFilter === 'uncollected'}
+			onclick={() => handleStatusClick('uncollected')}>
+			Need
+		</button>
+	</div>
 </div>

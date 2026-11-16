@@ -88,6 +88,20 @@ func createTestDeck(t *testing.T, db *gorm.DB, name string) models.Deck {
 	return deck
 }
 
+// addDeckItemDemand adds a main-zone, any-printing demand for a card to a deck.
+func addDeckItemDemand(t *testing.T, db *gorm.DB, deckID uint, oracleID string, qty int) {
+	t.Helper()
+	item := models.DeckItem{
+		DeckID:          deckID,
+		OracleID:        oracleID,
+		DesiredQuantity: qty,
+		Zone:            models.ZoneMain,
+	}
+	if err := db.Create(&item).Error; err != nil {
+		t.Fatalf("failed to create deck item: %v", err)
+	}
+}
+
 // List endpoint tests
 
 func TestDeckList_Empty(t *testing.T) {

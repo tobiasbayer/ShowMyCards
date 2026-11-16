@@ -177,9 +177,13 @@ func run(backend, queriesFile string, maxPages int) error {
 	return scanner.Err()
 }
 
+// backendClient talks to the local backend; the timeout keeps a hung backend
+// from stalling the run.
+var backendClient = &http.Client{Timeout: 30 * time.Second}
+
 // searchLocal runs a query on the backend's collection search.
 func searchLocal(backend, q string) ([]printing, error) {
-	resp, err := http.Get(backend + "/api/inventory/search?q=" + url.QueryEscape(q))
+	resp, err := backendClient.Get(backend + "/api/inventory/search?q=" + url.QueryEscape(q))
 	if err != nil {
 		return nil, err
 	}

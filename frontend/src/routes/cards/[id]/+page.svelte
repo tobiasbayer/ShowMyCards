@@ -45,18 +45,18 @@
 	/**
 	 * Back navigation target.
 	 *
-	 * Card detail pages can be reached from several places (search, a storage's
-	 * inventory view, the recent/unassigned views, or a list), so a hardcoded
-	 * "Back to Search" link sends users to the wrong place. We capture where the
+	 * Card detail pages can be reached from several places (the Cards page, the
+	 * inventory or storage overview, a deck or a list), so a hardcoded
+	 * "Back to Cards" link sends users to the wrong place. We capture where the
 	 * user arrived from and link back there instead.
 	 *
 	 * The origin is captured on the client whenever the user navigates here from
 	 * a non-card page, and persisted in sessionStorage so it survives both a
 	 * page reload and browsing between printings (each of which is a fresh
 	 * navigation from another /cards/ page). When nothing has been captured we
-	 * fall back to the search page, preserving the previous behaviour.
+	 * fall back to the Cards page.
 	 */
-	const FALLBACK_BACK = { href: resolve('/search'), label: 'Back to Search' };
+	const FALLBACK_BACK = { href: resolve('/cards'), label: 'Back to Cards' };
 	const BACK_STORAGE_KEY = 'smc-card-back-target';
 
 	let backPath = $state<string | null>(null);
@@ -89,7 +89,7 @@
 		if (pathname.startsWith('/inventory')) return 'Back to Inventory';
 		if (pathname.startsWith('/storage')) return 'Back to Storage';
 		if (pathname.startsWith('/lists')) return 'Back to List';
-		if (pathname.startsWith('/search')) return 'Back to Search';
+		if (pathname === '/cards') return 'Back to Cards';
 		return 'Back';
 	}
 

@@ -6,6 +6,7 @@ import (
 	"backend/scryfall"
 	"backend/services"
 	"backend/utils"
+	"context"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -21,16 +22,22 @@ import (
 // frontend/src/lib/utils/language-clause.ts.
 var languageClauseRegExp = regexp.MustCompile(`(?i)(^|\s)[-!]?(l|lang|language):`)
 
+// cardSource is the part of the Scryfall client the search handler uses.
+type cardSource interface {
+	SearchWithOptions(ctx context.Context, query string, opts scryfall.SearchOptions) (scryfall.SearchResult, error)
+	GetByID(ctx context.Context, id string) (goscryfall.Card, error)
+}
+
 // SearchHandler handles card search endpoints
 type SearchHandler struct {
-	client          *scryfall.Client
+	client          cardSource
 	db              *gorm.DB
 	settingsService *services.SettingsService
 	allocation      *services.AllocationService
 }
 
 // NewSearchHandler creates a new search handler
-func NewSearchHandler(client *scryfall.Client, db *gorm.DB, settingsService *services.SettingsService) *SearchHandler {
+func NewSearchHandler(client cardSource, db *gorm.DB, settingsService *services.SettingsService) *SearchHandler {
 	return &SearchHandler{
 		client:          client,
 		db:              db,
@@ -40,7 +47,8 @@ func NewSearchHandler(client *scryfall.Client, db *gorm.DB, settingsService *ser
 }
 
 // SearchResponse wraps search results with pagination metadata. Each result
-// carries its inventory data and per-Oracle deck availability.
+// carries its inventory data and deck availability: per card, plus the free
+// copies of each owned printing (`deck.printings`) for the per-printing badge.
 // tygo:export
 type SearchResponse struct {
 	Data       []InventoryCard `json:"data"`
@@ -233,7 +241,8 @@ func (h *SearchHandler) Search(c fiber.Ctx) error {
 	}
 	BackfillEnglishPrices(h.db.WithContext(c.RequestCtx()), ptrs)
 
-	// Attach per-Oracle deck availability (owned / decked / free) to every card.
+	// Attach deck availability (owned / decked / free per card, free per owned
+	// printing) to every card.
 	availability, err := h.allocation.ComputeAvailability(c.RequestCtx())
 	if err != nil {
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
@@ -241,14 +250,9 @@ func (h *SearchHandler) Search(c fiber.Ctx) error {
 	}
 	results := make([]InventoryCard, len(cards))
 	for i := range cards {
-		oa := availability.OracleAvailabilityFor(cards[i].OracleID)
 		results[i] = InventoryCard{
 			EnhancedCardResult: cards[i],
-			Deck: DeckAvailability{
-				Owned:  oa.Owned,
-				Decked: oa.Owned - oa.Free,
-				Free:   oa.Free,
-			},
+			Deck:               deckAvailability(availability, cards[i].OracleID),
 		}
 	}
 
@@ -307,35 +311,6 @@ func (h *SearchHandler) GetCard(c fiber.Ctx) error {
 		CardResult: cardResult,
 		Inventory:  inventoryData,
 	})
-}
-
-// AutocompleteResponse represents card name autocomplete suggestions
-// tygo:export
-type AutocompleteResponse struct {
-	Suggestions []string `json:"suggestions"`
-}
-
-// Autocomplete returns card name autocomplete suggestions from Scryfall
-func (h *SearchHandler) Autocomplete(c fiber.Ctx) error {
-	query := c.Query("q")
-
-	if query == "" || len(query) < 2 {
-		return c.JSON(AutocompleteResponse{Suggestions: []string{}})
-	}
-
-	result, err := h.client.Autocomplete(c.RequestCtx(), query)
-	if err != nil {
-		slog.Warn("autocomplete failed", "component", "search", "error", err)
-		return c.JSON(AutocompleteResponse{Suggestions: []string{}})
-	}
-
-	// Limit to 5 suggestions
-	suggestions := result
-	if len(suggestions) > 5 {
-		suggestions = suggestions[:5]
-	}
-
-	return c.JSON(AutocompleteResponse{Suggestions: suggestions})
 }
 
 func hasLanguageClause(query string) bool {

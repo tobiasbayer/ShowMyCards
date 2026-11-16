@@ -8,7 +8,7 @@ import type { ViewMode } from '$lib';
  *
  * @example
  * ```ts
- * const view = usePersistedViewMode('smc-search-view-mode', 'grid');
+ * const view = usePersistedViewMode('list-view-mode', 'table');
  * // In template: {#if view.viewMode === 'grid'}
  * // To change:   view.setViewMode('table')
  * ```
@@ -52,7 +52,7 @@ export class PersistedViewMode {
  *
  * @example
  * ```ts
- * const view = usePersistedViewMode('smc-search-view-mode', 'grid');
+ * const view = usePersistedViewMode('list-view-mode', 'table');
  * // In template: {#if view.viewMode === 'grid'}
  * // To change:   view.setViewMode('table')
  * ```

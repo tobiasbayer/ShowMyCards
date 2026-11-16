@@ -439,36 +439,6 @@ export interface InventoryCard extends EnhancedCardResult {
 	deck: DeckAvailability;
 }
 /**
- * InventoryCardsResponse represents paginated card results with inventory data
- * tygo:export
- */
-export interface InventoryCardsResponse {
-	data: InventoryCard[];
-	page: number /* int */;
-	page_size: number /* int */;
-	total_cards: number /* int */;
-	total_pages: number /* int */;
-}
-/**
- * ExistingPrintingInfo represents info about an existing printing in inventory
- * tygo:export
- */
-export interface ExistingPrintingInfo {
-	scryfall_id: string;
-	treatment: string;
-	quantity: number /* int */;
-	storage_location?: any /* models.StorageLocation */;
-}
-/**
- * ByOracleResponse represents the response for checking existing printings
- * tygo:export
- */
-export interface ByOracleResponse {
-	oracle_id: string;
-	printings: ExistingPrintingInfo[];
-	locations: any /* models.StorageLocation */[]; // Unique locations where this card exists
-}
-/**
  * BatchMoveRequest represents the request body for moving multiple inventory items
  * tygo:export
  */
@@ -732,7 +702,8 @@ export interface SchedulerHandler {}
 export interface SearchHandler {}
 /**
  * SearchResponse wraps search results with pagination metadata. Each result
- * carries its inventory data and per-Oracle deck availability.
+ * carries its inventory data and deck availability: per card, plus the free
+ * copies of each owned printing (`deck.printings`) for the per-printing badge.
  * tygo:export
  */
 export interface SearchResponse {
@@ -800,13 +771,6 @@ export interface CardInventoryData {
  */
 export interface EnhancedCardResult extends CardResult {
 	inventory: CardInventoryData;
-}
-/**
- * AutocompleteResponse represents card name autocomplete suggestions
- * tygo:export
- */
-export interface AutocompleteResponse {
-	suggestions: string[];
 }
 
 //////////
