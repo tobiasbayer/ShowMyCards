@@ -14,8 +14,6 @@ export async function fetchAllInventoryCards(
 	}
 
 	const firstPage = await fetchPage(1);
-	// Deck availability is Oracle-level, so the copy from the first page a printing appears on
-	// is correct for the merged card.
 	const cards = new Map<string, InventoryCard>();
 	const inventoryIds = new Set<number>();
 

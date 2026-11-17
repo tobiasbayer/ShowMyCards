@@ -45,18 +45,15 @@
 <div class="container mx-auto px-4 py-8 max-w-7xl">
 	<PageHeader title="Decks" description="Build decks from the cards you own">
 		{#snippet actions()}
-			<button onclick={() => (showCreateModal = true)} class="btn btn-primary">
-				<Plus class="w-4 h-4" />
-				New Deck
-			</button>
+			<button onclick={() => (showCreateModal = true)} class="btn btn-primary"
+				><Plus class="w-4 h-4" /> New Deck</button>
 		{/snippet}
 	</PageHeader>
 
 	{#if data.decks.length === 0}
 		<EmptyState message="No decks yet">
-			<button onclick={() => (showCreateModal = true)} class="btn btn-primary">
-				Create your first deck
-			</button>
+			<button onclick={() => (showCreateModal = true)} class="btn btn-primary"
+				>Create your first deck</button>
 		</EmptyState>
 	{:else}
 		<StatsCard
@@ -135,9 +132,9 @@
 		</div>
 
 		<div class="modal-action">
-			<button type="button" onclick={() => (showCreateModal = false)} class="btn bg-base-100">
-				Cancel
-			</button>
+			<button type="button" onclick={() => (showCreateModal = false)} class="btn bg-base-100"
+				>Cancel</button>
+
 			<button type="submit" class="btn btn-primary">Create</button>
 		</div>
 	</form>

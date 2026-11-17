@@ -12,7 +12,7 @@
 		DeckAddResultCard,
 		notifications,
 		getActionError,
-		type ScryfallCard,
+		type EnhancedCardResult,
 		type EnrichedDeckItem
 	} from '#lib';
 	import type { DeckGroupMode, DeckSortMode } from '#lib/utils/deck-grouping.ts';
@@ -54,10 +54,9 @@
 		}
 	});
 
-	const searchResults = $derived<ScryfallCard[]>(
-		form && 'searchResults' in form ? ((form.searchResults as ScryfallCard[]) ?? []) : []
+	const searchResults = $derived<EnhancedCardResult[]>(
+		form && 'searchResults' in form ? ((form.searchResults as EnhancedCardResult[]) ?? []) : []
 	);
-
 	const totalItems = $derived(
 		data.items.command.length +
 			data.items.main.length +
@@ -138,13 +137,12 @@
 	{#if data.deck}
 		<PageHeader title={data.deck.name} description={data.deck.description}>
 			{#snippet actions()}
-				<a href={resolve('/decks')} class="btn bg-base-100 btn-sm">
-					<ArrowLeft class="w-4 h-4" />
-					Back
-				</a>
-				<button onclick={startEdit} class="btn bg-base-100 btn-sm" title="Edit deck">
-					<Pencil class="w-4 h-4" />
-				</button>
+				<a href={resolve('/decks')} class="btn bg-base-100 btn-sm"
+					><ArrowLeft class="w-4 h-4" /> Back</a>
+
+				<button onclick={startEdit} class="btn bg-base-100 btn-sm" title="Edit deck"
+					><Pencil class="w-4 h-4" /></button>
+
 				<button
 					onclick={() => (showDeleteModal = true)}
 					class="btn bg-base-100 btn-sm text-error"
@@ -154,13 +152,29 @@
 			{/snippet}
 		</PageHeader>
 
-		<!-- Aggregate shortfall summary -->
-		<div class="alert mb-4" class:alert-warning={data.items.aggregate_shortfall > 0}>
-			{#if data.items.aggregate_shortfall > 0}
-				<span>
-					This deck needs <span class="font-semibold">{data.items.aggregate_shortfall}</span>
-					more card{data.items.aggregate_shortfall === 1 ? '' : 's'} than you own.
-				</span>
+		<!-- Aggregate shortfall / shared-cards summary -->
+		<div
+			class="alert mb-4"
+			class:alert-warning={data.items.aggregate_shortfall > 0}
+			class:alert-info={data.items.aggregate_shortfall === 0 &&
+				data.items.aggregate_over_committed > 0}>
+			{#if data.items.aggregate_shortfall > 0 || data.items.aggregate_over_committed > 0}
+				<div class="flex flex-col gap-1">
+					{#if data.items.aggregate_shortfall > 0}
+						<span>
+							This deck needs <span class="font-semibold">{data.items.aggregate_shortfall}</span>
+							more card{data.items.aggregate_shortfall === 1 ? '' : 's'} than you own.
+						</span>
+					{/if}
+					{#if data.items.aggregate_over_committed > 0}
+						<span>
+							{#if data.items.aggregate_shortfall === 0}You own every card in this deck, but{/if}
+							<span class="font-semibold">{data.items.aggregate_over_committed}</span>
+							card{data.items.aggregate_over_committed === 1 ? ' is' : 's are'}
+							also wanted by other decks. You don't have enough copies for all of them.
+						</span>
+					{/if}
+				</div>
 			{:else if totalItems > 0}
 				<span>You own everything this deck needs.</span>
 			{:else}
@@ -280,6 +294,7 @@
 </div>
 
 <!-- Edit Deck Modal -->
+
 <Modal open={showEditModal} onClose={() => (showEditModal = false)} title="Edit Deck">
 	<form
 		method="POST"
@@ -341,6 +356,7 @@
 </Modal>
 
 <!-- Delete Deck Modal -->
+
 <Modal open={showDeleteModal} onClose={() => (showDeleteModal = false)} title="Delete Deck">
 	<p>
 		Are you sure you want to delete <span class="font-semibold">{data.deck?.name}</span>? This will
@@ -353,9 +369,15 @@
 		action="?/deleteDeck"
 		use:enhance={() => {
 			isDeleting = true;
-			return async ({ result }) => {
+			return async ({ result, update }) => {
+				if (result.type === 'redirect') {
+					// Deck deleted; the action redirects to /decks. A custom enhance
+					// callback replaces the default handling, so follow it here.
+					await update();
+					notifications.success('Deck deleted successfully!');
+					return;
+				}
 				isDeleting = false;
-				// A successful delete redirects (303) to /decks; enhance follows it.
 				if (result.type === 'failure') {
 					notifications.error(getActionError(result.data, 'Failed to delete deck'));
 				}

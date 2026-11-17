@@ -13,7 +13,8 @@ function deck(id: number, name: string): DeckSummary {
 		updated_at: '',
 		total_items: 0,
 		total_cards_demand: 0,
-		aggregate_shortfall: 0
+		aggregate_shortfall: 0,
+		aggregate_over_committed: 0
 	};
 }
 

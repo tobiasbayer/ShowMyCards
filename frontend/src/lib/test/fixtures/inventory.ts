@@ -18,7 +18,6 @@ export function inventoryCard(
 	items: Inventory[],
 	overrides: Partial<InventoryCard> = {}
 ): InventoryCard {
-	const total = items.reduce((sum, item) => sum + item.quantity, 0);
 	return {
 		id,
 		oracle_id: 'oracle-1',
@@ -32,9 +31,9 @@ export function inventoryCard(
 		inventory: {
 			this_printing: items,
 			other_printings: [],
-			total_quantity: total
+			total_quantity: items.reduce((total, item) => total + item.quantity, 0)
 		},
-		deck: { owned: total, decked: 0, free: total },
+		deck: { owned: 0, decked: 0, free: 0 },
 		...overrides
 	};
 }

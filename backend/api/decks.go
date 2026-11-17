@@ -19,13 +19,16 @@ import (
 type DeckHandler struct {
 	db         *gorm.DB
 	allocation *services.AllocationService
+	settings   *services.SettingsService
 }
 
-// NewDeckHandler creates a new deck handler.
-func NewDeckHandler(db *gorm.DB) *DeckHandler {
+// NewDeckHandler creates a new deck handler. settings may be nil, in which case
+// any-printing items are shown in English.
+func NewDeckHandler(db *gorm.DB, settings *services.SettingsService) *DeckHandler {
 	return &DeckHandler{
 		db:         db,
 		allocation: services.NewAllocationService(db),
+		settings:   settings,
 	}
 }
 
@@ -33,20 +36,46 @@ func NewDeckHandler(db *gorm.DB) *DeckHandler {
 //
 // AggregateShortfall is the under-owned shortfall — the number of cards the deck
 // wants that the user does not physically own (Σ max(0, desired − owned_O) over
-// the deck's demand-zone items). It is independent of other decks; the
-// cross-deck over-commitment signal lives on the deck-detail items endpoint.
+// the deck's demand-zone items). It is independent of other decks.
+//
+// AggregateOverCommitted is the cross-deck signal: the number of distinct cards
+// the deck could cover on its own but that are wanted by other decks too, so the
+// owned copies cannot satisfy every deck at once. A card that is already
+// under-owned counts toward the shortfall instead, never here. Both signals are
+// shown to the user; neither picks a winning deck.
 // See FR98/IMPLEMENTATION_PLAN.md §2.
 //
 // tygo:export
 type DeckSummary struct {
-	ID                 uint   `json:"id"`
-	CreatedAt          string `json:"created_at"`
-	UpdatedAt          string `json:"updated_at"`
-	Name               string `json:"name"`
-	Description        string `json:"description"`
-	TotalItems         int    `json:"total_items"`
-	TotalCardsDemand   int    `json:"total_cards_demand"`
-	AggregateShortfall int    `json:"aggregate_shortfall"`
+	ID                     uint   `json:"id"`
+	CreatedAt              string `json:"created_at"`
+	UpdatedAt              string `json:"updated_at"`
+	Name                   string `json:"name"`
+	Description            string `json:"description"`
+	TotalItems             int    `json:"total_items"`
+	TotalCardsDemand       int    `json:"total_cards_demand"`
+	AggregateShortfall     int    `json:"aggregate_shortfall"`
+	AggregateOverCommitted int    `json:"aggregate_over_committed"`
+}
+
+// deckDemandTotals measures a deck's per-Oracle demand against the owned pool and
+// the cross-deck allocation. shortfall is Σ max(0, demand − owned) over the
+// Oracles; overCommitted counts the Oracles the deck covers alone
+// (demand ≤ owned) that the allocation service flags as over-committed across
+// decks. The two are disjoint, mirroring the per-item under_owned/over_committed
+// flags in enrichDeckItems. demandByOracle must contain demand-zone rows only, so
+// maybe-board cards never count.
+func deckDemandTotals(demandByOracle map[string]int, availability services.AvailabilityMap) (shortfall, overCommitted int) {
+	for oracleID, demand := range demandByOracle {
+		a := availability.OracleAvailabilityFor(oracleID)
+		switch {
+		case demand > a.Owned:
+			shortfall += demand - a.Owned
+		case a.OverCommitted:
+			overCommitted++
+		}
+	}
+	return shortfall, overCommitted
 }
 
 // List returns all decks with summary statistics.
@@ -80,22 +109,18 @@ func (h *DeckHandler) List(c fiber.Ctx) error {
 			demandByOracle[item.OracleID] += item.DesiredQuantity
 		}
 
-		shortfall := 0
-		for oracleID, demand := range demandByOracle {
-			if owned := availability.OracleAvailabilityFor(oracleID).Owned; demand > owned {
-				shortfall += demand - owned
-			}
-		}
+		shortfall, overCommitted := deckDemandTotals(demandByOracle, availability)
 
 		summaries[i] = DeckSummary{
-			ID:                 deck.ID,
-			CreatedAt:          deck.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:          deck.UpdatedAt.Format(time.RFC3339),
-			Name:               deck.Name,
-			Description:        deck.Description,
-			TotalItems:         len(deck.Items),
-			TotalCardsDemand:   totalDemand,
-			AggregateShortfall: shortfall,
+			ID:                     deck.ID,
+			CreatedAt:              deck.CreatedAt.Format(time.RFC3339),
+			UpdatedAt:              deck.UpdatedAt.Format(time.RFC3339),
+			Name:                   deck.Name,
+			Description:            deck.Description,
+			TotalItems:             len(deck.Items),
+			TotalCardsDemand:       totalDemand,
+			AggregateShortfall:     shortfall,
+			AggregateOverCommitted: overCommitted,
 		}
 	}
 
@@ -345,17 +370,20 @@ type EnrichedDeckItem struct {
 // aggregate availability information.
 //
 // AggregateShortfall is the deck's under-owned shortfall (Σ max(0, desired −
-// owned_O) over demand-zone items). Maybe-board items are returned but never
-// contribute to the shortfall.
+// owned_O) over demand-zone items). AggregateOverCommitted is the number of
+// distinct demand-zone cards the deck covers alone but that other decks want too
+// (see DeckSummary). Maybe-board items are returned but never contribute to
+// either.
 //
 // tygo:export
 type DeckItemsResponse struct {
-	DeckID             uint               `json:"deck_id"`
-	Command            []EnrichedDeckItem `json:"command"`
-	Main               []EnrichedDeckItem `json:"main"`
-	Side               []EnrichedDeckItem `json:"side"`
-	Maybe              []EnrichedDeckItem `json:"maybe"`
-	AggregateShortfall int                `json:"aggregate_shortfall"`
+	DeckID                 uint               `json:"deck_id"`
+	Command                []EnrichedDeckItem `json:"command"`
+	Main                   []EnrichedDeckItem `json:"main"`
+	Side                   []EnrichedDeckItem `json:"side"`
+	Maybe                  []EnrichedDeckItem `json:"maybe"`
+	AggregateShortfall     int                `json:"aggregate_shortfall"`
+	AggregateOverCommitted int                `json:"aggregate_over_committed"`
 }
 
 // ListItems returns the items in a deck, grouped by zone, enriched with card
@@ -429,13 +457,10 @@ func (h *DeckHandler) ListItems(c fiber.Ctx) error {
 	}
 
 	// Aggregate shortfall = Σ over distinct demand-zone Oracles of
-	// max(0, deckDemand − owned). Computed per Oracle (not per row) so a card
-	// split across zones is counted once against the owned pool.
-	for oracleID, demand := range deckDemandByOracle {
-		if owned := availability.OracleAvailabilityFor(oracleID).Owned; demand > owned {
-			resp.AggregateShortfall += demand - owned
-		}
-	}
+	// max(0, deckDemand − owned); aggregate over-committed counts the Oracles the
+	// deck covers alone but other decks want too. Computed per Oracle (not per row)
+	// so a card split across zones is counted once against the owned pool.
+	resp.AggregateShortfall, resp.AggregateOverCommitted = deckDemandTotals(deckDemandByOracle, availability)
 
 	return c.JSON(resp)
 }
@@ -532,8 +557,10 @@ func (h *DeckHandler) enrichDeckItems(ctx context.Context, items []models.DeckIt
 }
 
 // representativeCardsByOracle returns one Scryfall card per Oracle ID for the
-// any-printing items in the slice, so they can be enriched with a name and set
-// even though no specific printing was pinned.
+// any-printing items in the slice, so they can be shown with a name, set and
+// image even though no specific printing was pinned. It prefers a printing the
+// user owns, then the default search language, then the most "default" looking
+// printing (see models.GetPreferredCardsByOracle).
 func (h *DeckHandler) representativeCardsByOracle(ctx context.Context, items []models.DeckItem) map[string]scryfall.Card {
 	oracleIDs := make([]string, 0, len(items))
 	seen := make(map[string]bool)
@@ -543,33 +570,23 @@ func (h *DeckHandler) representativeCardsByOracle(ctx context.Context, items []m
 			oracleIDs = append(oracleIDs, item.OracleID)
 		}
 	}
-
-	out := make(map[string]scryfall.Card, len(oracleIDs))
 	if len(oracleIDs) == 0 {
-		return out
+		return map[string]scryfall.Card{}
 	}
 
-	// Fetch the first card row for each Oracle ID. cards.oracle_id is indexed.
-	var cards []models.Card
-	if err := h.db.WithContext(ctx).
-		Where("oracle_id IN ?", oracleIDs).
-		Find(&cards).Error; err != nil {
+	lang := "en"
+	if h.settings != nil {
+		if v, err := h.settings.Get(ctx, "scryfall_default_language"); err == nil && v != "" {
+			lang = v
+		}
+	}
+
+	cards, err := models.GetPreferredCardsByOracle(h.db.WithContext(ctx), oracleIDs, lang, true)
+	if err != nil {
 		slog.Warn("failed to fetch representative cards for deck enrichment", "component", "decks", "error", err)
-		return out
+		return map[string]scryfall.Card{}
 	}
-
-	for _, card := range cards {
-		if _, ok := out[card.OracleID]; ok {
-			continue // keep the first representative printing per Oracle
-		}
-		sc, err := card.ToScryfallCard()
-		if err != nil {
-			slog.Warn("failed to unmarshal representative card", "component", "decks", "scryfall_id", card.ScryfallID, "error", err)
-			continue
-		}
-		out[card.OracleID] = sc
-	}
-	return out
+	return cards
 }
 
 // CreateDeckItemRequest represents a single item to add to a deck.
@@ -645,6 +662,10 @@ func (h *DeckHandler) CreateItemsBatch(c fiber.Ctx) error {
 		return tx.Create(&items).Error
 	})
 	if err != nil {
+		if utils.IsDuplicateKey(err) {
+			return utils.ReturnError(c, fiber.StatusConflict,
+				"one or more cards already exist in this deck and zone")
+		}
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to create deck items", "database insert failed", err)
 	}
@@ -714,11 +735,127 @@ func (h *DeckHandler) UpdateItem(c fiber.Ctx) error {
 	}
 
 	if err := h.db.WithContext(c.RequestCtx()).Save(&item).Error; err != nil {
+		if utils.IsDuplicateKey(err) {
+			return utils.ReturnError(c, fiber.StatusConflict,
+				"a card with that printing and finish already exists in that zone")
+		}
 		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
 			"Failed to update deck item", "database update failed", err)
 	}
 
 	return c.JSON(item)
+}
+
+// MoveDeckItemRequest represents the request body for moving copies of a deck
+// item to another zone.
+//
+// tygo:export
+type MoveDeckItemRequest struct {
+	Zone     models.DeckZone `json:"zone"`
+	Quantity int             `json:"quantity"`
+}
+
+var (
+	errMoveItemNotFound    = errors.New("deck item not found")
+	errMoveQuantityTooHigh = errors.New("quantity exceeds the item's desired quantity")
+)
+
+// MoveItem moves some or all copies of a deck item to another zone in a single
+// transaction. If the target zone already holds the same card (oracle, pinned
+// printing and finish), the copies merge into that row rather than colliding
+// on the unique index; otherwise a row is created, or the item itself is moved
+// when every copy goes. The source row is reduced, and deleted when emptied.
+// Responds with the resulting target row.
+func (h *DeckHandler) MoveItem(c fiber.Ctx) error {
+	deckID := fiber.Params[int](c, "id")
+	if deckID == 0 {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid deck id")
+	}
+
+	itemID := fiber.Params[int](c, "item_id")
+	if itemID == 0 {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid item id")
+	}
+
+	var req MoveDeckItemRequest
+	if err := c.Bind().Body(&req); err != nil {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "invalid request body")
+	}
+	if !req.Zone.IsValid() {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "zone must be one of main, side, command, maybe")
+	}
+	if req.Quantity < 1 {
+		return utils.ReturnError(c, fiber.StatusBadRequest, "quantity must be at least 1")
+	}
+
+	var target models.DeckItem
+	err := h.db.WithContext(c.RequestCtx()).Transaction(func(tx *gorm.DB) error {
+		var source models.DeckItem
+		if err := tx.Where("id = ? AND deck_id = ?", itemID, deckID).First(&source).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errMoveItemNotFound
+			}
+			return err
+		}
+		if source.Zone == req.Zone {
+			target = source
+			return nil
+		}
+		if req.Quantity > source.DesiredQuantity {
+			return errMoveQuantityTooHigh
+		}
+
+		err := tx.Where("deck_id = ? AND oracle_id = ? AND scryfall_id = ? AND treatment = ? AND zone = ?",
+			deckID, source.OracleID, source.ScryfallID, source.Treatment, req.Zone).First(&target).Error
+		switch {
+		case err == nil:
+			// Same card already in the target zone: merge into it.
+			target.DesiredQuantity += req.Quantity
+			if err := tx.Save(&target).Error; err != nil {
+				return err
+			}
+		case !errors.Is(err, gorm.ErrRecordNotFound):
+			return err
+		case req.Quantity == source.DesiredQuantity:
+			// Moving every copy and nothing to merge with: move the row itself.
+			source.Zone = req.Zone
+			if err := tx.Save(&source).Error; err != nil {
+				return err
+			}
+			target = source
+			return nil
+		default:
+			target = models.DeckItem{
+				DeckID:          source.DeckID,
+				OracleID:        source.OracleID,
+				ScryfallID:      source.ScryfallID,
+				Treatment:       source.Treatment,
+				Zone:            req.Zone,
+				DesiredQuantity: req.Quantity,
+			}
+			if err := tx.Create(&target).Error; err != nil {
+				return err
+			}
+		}
+
+		source.DesiredQuantity -= req.Quantity
+		if source.DesiredQuantity == 0 {
+			return tx.Delete(&source).Error
+		}
+		return tx.Save(&source).Error
+	})
+
+	switch {
+	case errors.Is(err, errMoveItemNotFound):
+		return utils.ReturnError(c, fiber.StatusNotFound, err.Error())
+	case errors.Is(err, errMoveQuantityTooHigh):
+		return utils.ReturnError(c, fiber.StatusBadRequest, err.Error())
+	case err != nil:
+		return utils.LogAndReturnError(c, fiber.StatusInternalServerError,
+			"Failed to move deck item", "database move failed", err)
+	}
+
+	return c.JSON(target)
 }
 
 // DeleteItem removes an item from a deck.

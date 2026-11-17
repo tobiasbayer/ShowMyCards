@@ -80,11 +80,10 @@
 
 	// Client-side filtering state
 	let filterText = $state('');
-	let sortOrder = $state<'recent' | 'price-desc' | 'price-asc'>('recent');
-
 	// "Available for deck building": show only cards with at least one free copy
 	// (owned − deck demand). Filtered client-side from each card's deck block.
 	let deckAvailableOnly = $state(false);
+	let sortOrder = $state<'recent' | 'price-desc' | 'price-asc'>('recent');
 	const PAGE_SIZE = 24;
 	let currentPage = $state(1);
 
@@ -271,9 +270,9 @@
 			{#each paginatedCards as card (`${card.id}-${card.inventory.total_quantity}`)}
 				<CardResultCard
 					{card}
+					deck={card.deck}
 					{readOnly}
 					{showLocations}
-					deck={card.deck}
 					onremove={handleRemove}
 					selectable={!readOnly}
 					onSplitMove={readOnly
@@ -374,7 +373,6 @@
 							</td>
 
 							<td><span class="badge badge-primary">{totalQty}</span></td>
-
 							<td>
 								<span
 									class="badge badge-sm {card.deck.free > 0 ? 'badge-success' : 'badge-ghost'}"
@@ -382,6 +380,7 @@
 									{card.deck.free} free
 								</span>
 							</td>
+
 							{#if showPriceSort}
 								{@const price = getInventoryUnitPrice(card, currency.current)}
 								<td class="whitespace-nowrap">

@@ -4,6 +4,9 @@ import { render } from 'vitest-browser-svelte';
 import type { EnhancedCardResult } from '#lib';
 import CardResultCard from './CardResultCard.svelte';
 
+// Kit's own runtime (e.g. $app/forms) imports afterNavigate from this module, so it must be stubbed too.
+vi.mock('$app/navigation', () => ({ refreshAll: vi.fn(), afterNavigate: vi.fn() }));
+
 function makeCard(overrides: Partial<EnhancedCardResult> = {}): EnhancedCardResult {
 	return {
 		id: 'card-1',

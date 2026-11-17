@@ -173,7 +173,7 @@ describe('InventoryBrowser', () => {
 		await expect
 			.element(page.getByRole('button', { name: '−', exact: true }))
 			.not.toBeInTheDocument();
-		// The deck-availability filter is the only checkbox: no selection controls.
+		// No selection checkboxes: the deck-availability filter is the only one.
 		await expect
 			.element(page.getByRole('checkbox', { name: 'Available for deck building' }))
 			.toBeInTheDocument();
@@ -214,7 +214,7 @@ describe('InventoryBrowser', () => {
 		await expect
 			.element(page.getByRole('columnheader', { name: 'Actions' }))
 			.not.toBeInTheDocument();
-		// The deck-availability filter is the only checkbox: no selection controls.
+		// No selection checkboxes: the deck-availability filter is the only one.
 		await expect
 			.element(page.getByRole('checkbox', { name: 'Available for deck building' }))
 			.toBeInTheDocument();
