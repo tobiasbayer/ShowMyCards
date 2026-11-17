@@ -22,16 +22,22 @@ function items(onPick: () => void) {
 /** Whether the menu is open; a closed <details> hides its items from role queries. */
 const isOpen = () => document.querySelector('details')?.open ?? false;
 
-function setup(props: Record<string, unknown> = {}) {
+async function setup(props: Record<string, unknown> = {}) {
 	const onPick = vi.fn();
 	const onOpenChange = vi.fn();
-	render(Dropdown, { trigger, children: items(onPick), label: 'Deck', onOpenChange, ...props });
+	await render(Dropdown, {
+		trigger,
+		children: items(onPick),
+		label: 'Deck',
+		onOpenChange,
+		...props
+	});
 	return { onPick, onOpenChange, summary: page.getByLabelText('Deck') };
 }
 
 describe('Dropdown', () => {
 	it('opens on click and closes after a pick', async () => {
-		const { onPick, onOpenChange, summary } = setup();
+		const { onPick, onOpenChange, summary } = await setup();
 
 		expect(isOpen()).toBe(false);
 		await summary.click();
@@ -45,7 +51,7 @@ describe('Dropdown', () => {
 	it('takes Esc for itself, so a surrounding dialog stays open, and refocuses the trigger', async () => {
 		const outer = vi.fn();
 		window.addEventListener('keydown', outer);
-		const { summary } = setup();
+		const { summary } = await setup();
 
 		await summary.click();
 		expect(isOpen()).toBe(true);
@@ -60,7 +66,7 @@ describe('Dropdown', () => {
 	it('leaves Esc alone while closed', async () => {
 		const outer = vi.fn();
 		window.addEventListener('keydown', outer);
-		setup();
+		await setup();
 
 		await userEvent.keyboard('{Escape}');
 
@@ -69,7 +75,7 @@ describe('Dropdown', () => {
 	});
 
 	it('closes on a click outside', async () => {
-		const { summary } = setup();
+		const { summary } = await setup();
 
 		await summary.click();
 		expect(isOpen()).toBe(true);
@@ -80,7 +86,11 @@ describe('Dropdown', () => {
 
 	it('closes when it becomes disabled', async () => {
 		const onPick = vi.fn();
-		const { rerender } = render(Dropdown, { trigger, children: items(onPick), label: 'Deck' });
+		const { rerender } = await render(Dropdown, {
+			trigger,
+			children: items(onPick),
+			label: 'Deck'
+		});
 
 		await page.getByLabelText('Deck').click();
 		expect(isOpen()).toBe(true);
@@ -90,7 +100,7 @@ describe('Dropdown', () => {
 	});
 
 	it("can't be opened while disabled, and keeps its tooltip", async () => {
-		const { summary } = setup({ disabled: true, title: 'The order in your search applies' });
+		const { summary } = await setup({ disabled: true, title: 'The order in your search applies' });
 
 		await expect.element(summary).toHaveAttribute('aria-disabled', 'true');
 		await expect.element(summary).toHaveAttribute('tabindex', '-1');

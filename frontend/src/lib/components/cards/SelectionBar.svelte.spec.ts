@@ -27,7 +27,7 @@ describe('SelectionBar', () => {
 			catalog: { cards: [unowned], hasMore: false, total: 1 }
 		});
 		view.toggleCheck(unowned);
-		render(SelectionBar, { view });
+		await render(SelectionBar, { view });
 
 		await expect
 			.element(page.getByRole('button', { name: 'Add selected cards to a deck' }))
@@ -48,7 +48,7 @@ describe('SelectionBar', () => {
 		const view = cardsView({ collection: [bolt] });
 		view.location = 1;
 		view.toggleCheck(bolt);
-		render(SelectionBar, { view });
+		await render(SelectionBar, { view });
 
 		await page.getByRole('button', { name: 'Delete selected copies' }).click();
 
@@ -63,10 +63,10 @@ describe('SelectionBar', () => {
 		const bolt = card([row(1, 2)]);
 		const view = cardsView({ collection: [bolt] });
 		view.toggleCheck(bolt);
-		render(SelectionBar, { view });
+		await render(SelectionBar, { view });
 
 		await expect
 			.element(page.getByTitle('1 printing · 2 copies'))
-			.toHaveTextContent(/^1\s+selected$/);
+			.toMatchTextContent(/^1\s+selected$/);
 	});
 });

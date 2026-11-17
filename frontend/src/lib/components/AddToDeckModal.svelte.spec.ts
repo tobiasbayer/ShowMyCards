@@ -89,7 +89,7 @@ describe('AddToDeckModal', () => {
 		mockBackend([deck(7, 'Mono Red'), deck(9, 'Elves')]);
 		const onAdded = vi.fn();
 		const onClose = vi.fn();
-		render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose });
+		await render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose });
 
 		await pickDeck('Elves');
 		await page.getByRole('radio', { name: 'Side' }).click();
@@ -111,7 +111,7 @@ describe('AddToDeckModal', () => {
 	it('pins the printing when asked to by default, and only then', async () => {
 		mockBackend([deck(7, 'Mono Red')]);
 		const onAdded = vi.fn();
-		render(AddToDeckModal, {
+		await render(AddToDeckModal, {
 			open: true,
 			cards: [sol],
 			pinByDefault: true,
@@ -129,7 +129,7 @@ describe('AddToDeckModal', () => {
 
 	it('leaves the printing unpinned by default', async () => {
 		mockBackend([deck(7, 'Mono Red')]);
-		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+		await render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
 		await expect
 			.element(page.getByRole('checkbox', { name: /Pin this printing/ }))
@@ -139,7 +139,7 @@ describe('AddToDeckModal', () => {
 	it('adds a quantity of each of several cards outside bulk mode', async () => {
 		mockBackend([deck(7, 'Mono Red')]);
 		const onAdded = vi.fn();
-		render(AddToDeckModal, {
+		await render(AddToDeckModal, {
 			open: true,
 			cards: [sol, { oracle_id: 'bolt', scryfall_id: 'm10-1', name: 'Lightning Bolt', copies: 1 }],
 			onAdded,
@@ -167,7 +167,7 @@ describe('AddToDeckModal', () => {
 		localStorage.setItem('smc-last-deck-id', '9');
 		mockBackend([deck(7, 'Mono Red'), deck(9, 'Elves')]);
 		const onAdded = vi.fn();
-		render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose: vi.fn() });
+		await render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose: vi.fn() });
 
 		await expect.element(page.getByLabelText('Deck', { exact: true })).toHaveTextContent('Elves');
 		await page.getByRole('button', { name: 'New' }).click();
@@ -182,7 +182,7 @@ describe('AddToDeckModal', () => {
 	it("can't add while the new deck has no name", async () => {
 		localStorage.setItem('smc-last-deck-id', '9');
 		mockBackend([deck(7, 'Mono Red'), deck(9, 'Elves')]);
-		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+		await render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
 		await expect.element(page.getByLabelText('Deck', { exact: true })).toHaveTextContent('Elves');
 		await page.getByRole('button', { name: 'New' }).click();
@@ -193,7 +193,7 @@ describe('AddToDeckModal', () => {
 	it('preselects the last deck used', async () => {
 		localStorage.setItem('smc-last-deck-id', '9');
 		mockBackend([deck(7, 'Mono Red'), deck(9, 'Elves')]);
-		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+		await render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
 		await expect.element(page.getByLabelText('Deck', { exact: true })).toHaveTextContent('Elves');
 	});
@@ -201,7 +201,7 @@ describe('AddToDeckModal', () => {
 	it('offers a copies toggle in bulk mode and adds one of each', async () => {
 		mockBackend([deck(7, 'Mono Red')]);
 		const onAdded = vi.fn();
-		render(AddToDeckModal, {
+		await render(AddToDeckModal, {
 			open: true,
 			bulk: true,
 			cards: [
@@ -233,9 +233,11 @@ describe('AddToDeckModal', () => {
 
 	it('prompts to create a deck when there are none', async () => {
 		mockBackend([]);
-		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+		await render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
-		await expect.element(page.getByText('You have no decks yet')).toBeInTheDocument();
+		await expect
+			.element(page.getByText('You have no decks yet. Name your first one:'))
+			.toBeInTheDocument();
 		await expect.element(page.getByPlaceholder('New deck name')).toBeInTheDocument();
 		await expect.element(page.getByRole('button', { name: 'Add to deck' })).toBeDisabled();
 	});
@@ -258,7 +260,7 @@ describe('AddToDeckModal shared-copy notice', () => {
 
 	it('warns when the only owned copy is already wanted by another deck', async () => {
 		mockBackend(decks, oneCopyInMonoRed);
-		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+		await render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
 		await pickDeck('Elves');
 
@@ -267,7 +269,7 @@ describe('AddToDeckModal shared-copy notice', () => {
 
 	it('does not warn when the chosen deck is the one that holds the card', async () => {
 		mockBackend(decks, oneCopyInMonoRed);
-		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+		await render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
 		await pickDeck('Elves');
 		await expect.element(page.getByText(notice)).toBeInTheDocument();
@@ -278,7 +280,7 @@ describe('AddToDeckModal shared-copy notice', () => {
 
 	it('does not warn for the maybe board, which commits no copies', async () => {
 		mockBackend(decks, oneCopyInMonoRed);
-		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+		await render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
 		await pickDeck('Elves');
 		await expect.element(page.getByText(notice)).toBeInTheDocument();
@@ -295,7 +297,7 @@ describe('AddToDeckModal shared-copy notice', () => {
 			availability: { owned: 0, decked: 0, free: 0 },
 			usage: [usage(7, 'Mono Red')]
 		});
-		render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
+		await render(AddToDeckModal, { open: true, cards: [sol], onClose: vi.fn() });
 
 		await pickDeck('Elves');
 		await vi.waitFor(() => expect(requested('/for-card/')).toBe(true));
@@ -305,7 +307,7 @@ describe('AddToDeckModal shared-copy notice', () => {
 
 	it('does not look anything up in bulk mode', async () => {
 		mockBackend(decks, oneCopyInMonoRed);
-		render(AddToDeckModal, {
+		await render(AddToDeckModal, {
 			open: true,
 			bulk: true,
 			cards: [{ ...sol, copies: 3 }],
@@ -320,7 +322,7 @@ describe('AddToDeckModal shared-copy notice', () => {
 	it('still adds the card, with a warning toast naming the other deck', async () => {
 		mockBackend(decks, oneCopyInMonoRed);
 		const onAdded = vi.fn();
-		render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose: vi.fn() });
+		await render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose: vi.fn() });
 
 		await pickDeck('Elves');
 		await expect.element(page.getByText(notice)).toBeInTheDocument();
@@ -339,7 +341,7 @@ describe('AddToDeckModal shared-copy notice', () => {
 			usage: [usage(7, 'Mono Red')]
 		});
 		const onAdded = vi.fn();
-		render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose: vi.fn() });
+		await render(AddToDeckModal, { open: true, cards: [sol], onAdded, onClose: vi.fn() });
 
 		await pickDeck('Elves');
 		await vi.waitFor(() => expect(requested('/for-card/')).toBe(true));
@@ -356,7 +358,7 @@ describe('AddToDeckModal keyboard', () => {
 	it('closes on Esc', async () => {
 		mockBackend([deck(7, 'Mono Red')]);
 		const onClose = vi.fn();
-		render(AddToDeckModal, { open: true, cards: [sol], onClose });
+		await render(AddToDeckModal, { open: true, cards: [sol], onClose });
 
 		await expect.element(page.getByLabelText('Deck', { exact: true })).toBeInTheDocument();
 		await userEvent.keyboard('{Escape}');
@@ -367,7 +369,7 @@ describe('AddToDeckModal keyboard', () => {
 	it('only cancels "New" on Esc in the deck name', async () => {
 		mockBackend([deck(7, 'Mono Red')]);
 		const onClose = vi.fn();
-		render(AddToDeckModal, { open: true, cards: [sol], onClose });
+		await render(AddToDeckModal, { open: true, cards: [sol], onClose });
 
 		await page.getByRole('button', { name: 'New' }).click();
 		await page.getByPlaceholder('New deck name').click();
@@ -380,7 +382,7 @@ describe('AddToDeckModal keyboard', () => {
 	it('only closes the deck menu on Esc while it is open', async () => {
 		mockBackend([deck(7, 'Mono Red'), deck(9, 'Elves')]);
 		const onClose = vi.fn();
-		render(AddToDeckModal, { open: true, cards: [sol], onClose });
+		await render(AddToDeckModal, { open: true, cards: [sol], onClose });
 
 		await page.getByLabelText('Deck', { exact: true }).click();
 		await userEvent.keyboard('{Escape}');

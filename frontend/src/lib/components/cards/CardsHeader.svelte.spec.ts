@@ -22,7 +22,7 @@ describe('CardsHeader', () => {
 	it('reruns the typed search in the scope picked', async () => {
 		const view = cardsView();
 		const setScope = vi.spyOn(view, 'setScope').mockImplementation(() => {});
-		render(CardsHeader, { view });
+		await render(CardsHeader, { view });
 
 		await page.getByRole('searchbox', { name: 'Search your cards' }).fill('t:dragon');
 		await page.getByLabelText('Where to search: My collection').click();
@@ -32,7 +32,7 @@ describe('CardsHeader', () => {
 	});
 
 	it('disables the language menu while the search names a language', async () => {
-		render(CardsHeader, { view: cardsView() });
+		await render(CardsHeader, { view: cardsView() });
 
 		await page.getByRole('searchbox').fill('bolt l:ja');
 
@@ -45,7 +45,7 @@ describe('CardsHeader', () => {
 	});
 
 	it("names the scope's default order in the sort menu", async () => {
-		const { rerender } = render(CardsHeader, { view: cardsView() });
+		const { rerender } = await render(CardsHeader, { view: cardsView() });
 		await expect.element(page.getByLabelText('Sort order: Newest')).toBeInTheDocument();
 
 		await rerender({ view: cardsView({ source: 'catalog', query: 'bolt' }) });
@@ -55,7 +55,7 @@ describe('CardsHeader', () => {
 	it('counts copies in the collection, with the printings in the tooltip', async () => {
 		const bolt = card([row(1, 2), row(2, 1, 2)]);
 		const other = card([row(3, 1)], {}, { id: 'bolt-2' });
-		render(CardsHeader, { view: cardsView({ collection: [bolt, other] }) });
+		await render(CardsHeader, { view: cardsView({ collection: [bolt, other] }) });
 
 		await expect.element(page.getByTitle('4 copies in 2 printings')).toHaveTextContent('4 cards');
 	});
@@ -63,7 +63,7 @@ describe('CardsHeader', () => {
 	it('runs the search on Enter', async () => {
 		const view = cardsView();
 		const navigate = vi.spyOn(view, 'navigate').mockImplementation(() => {});
-		render(CardsHeader, { view });
+		await render(CardsHeader, { view });
 
 		await page.getByRole('searchbox').fill('c:r');
 		await userEvent.keyboard('{Enter}');

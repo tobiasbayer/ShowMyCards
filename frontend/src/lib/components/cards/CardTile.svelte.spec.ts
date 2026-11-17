@@ -23,7 +23,7 @@ describe('CardTile', () => {
 			free: 2,
 			printings: { 'bolt-1': 2 }
 		});
-		render(CardTile, { card: bolt, view: cardsView({ collection: [bolt] }) });
+		await render(CardTile, { card: bolt, view: cardsView({ collection: [bolt] }) });
 
 		await expect
 			.element(page.getByRole('img', { name: '3 copies in your collection' }))
@@ -41,7 +41,7 @@ describe('CardTile', () => {
 		});
 		const view = cardsView({ collection: [bolt] });
 		view.location = 2;
-		render(CardTile, { card: bolt, view });
+		await render(CardTile, { card: bolt, view });
 
 		await expect.element(page.getByRole('img', { name: '1 copy in Box B' })).toBeInTheDocument();
 		await expect
@@ -61,7 +61,7 @@ describe('CardTile', () => {
 				}
 			}
 		);
-		render(CardTile, { card: bolt, view: cardsView({ source: 'catalog', query: 'bolt' }) });
+		await render(CardTile, { card: bolt, view: cardsView({ source: 'catalog', query: 'bolt' }) });
 
 		await expect
 			.element(page.getByRole('img', { name: 'You own another printing of this card' }))
@@ -73,7 +73,7 @@ describe('CardTile', () => {
 
 	it('shows the price only while the results are ordered by price', async () => {
 		const bolt = card();
-		const { rerender } = render(CardTile, {
+		const { rerender } = await render(CardTile, {
 			card: bolt,
 			view: cardsView({
 				source: 'catalog',
@@ -90,7 +90,7 @@ describe('CardTile', () => {
 
 	it('shows a dash when the order is by a price the card lacks', async () => {
 		const bolt = card([], {}, { prices: {} });
-		render(CardTile, {
+		await render(CardTile, {
 			card: bolt,
 			view: cardsView({
 				source: 'catalog',
@@ -105,7 +105,7 @@ describe('CardTile', () => {
 	it('opens the panel on click, and toggles the check instead while selecting', async () => {
 		const bolt = card([row(1, 1)]);
 		const view = cardsView({ collection: [bolt] });
-		render(CardTile, { card: bolt, view });
+		await render(CardTile, { card: bolt, view });
 
 		await page.getByRole('button', { name: 'Show details for Lightning Bolt' }).click();
 		expect(view.selected?.id).toBe('bolt-1');

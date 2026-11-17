@@ -44,7 +44,7 @@ describe('CardPanel', () => {
 			card([], {}, { id: 'bolt-2', set_name: 'Alpha', collector_number: '161' })
 		];
 		const bolt = card([row(1, 2, 1, 'foil')]);
-		render(CardPanel, { card: bolt, view: cardsView({ collection: [bolt] }) });
+		await render(CardPanel, { card: bolt, view: cardsView({ collection: [bolt] }) });
 
 		await expect.element(page.getByText('Box A')).toBeInTheDocument();
 		await expect.element(page.getByRole('link', { name: 'Burn' })).toBeInTheDocument();
@@ -56,7 +56,7 @@ describe('CardPanel', () => {
 	it('hides sections with nothing in them', async () => {
 		// Its own card: other printings are cached per card for the session.
 		const opt = card([], {}, { id: 'opt-1', oracle_id: 'opt', name: 'Opt' });
-		render(CardPanel, { card: opt, view: cardsView() });
+		await render(CardPanel, { card: opt, view: cardsView() });
 
 		await expect.element(page.getByText('None yet')).toBeInTheDocument();
 		// No deck wants it: "In decks" is just the link to add it to one.
@@ -70,9 +70,9 @@ describe('CardPanel', () => {
 	it('tells a failed load from an empty one, and retries', async () => {
 		backend.failing = ['GET /api/decks/for-card/'];
 		backend.decks = [inBurn];
-		render(CardPanel, { card: card(), view: cardsView() });
+		await render(CardPanel, { card: card(), view: cardsView() });
 
-		await expect.element(page.getByText("Couldn't load its decks.")).toBeInTheDocument();
+		await expect.element(page.getByText(/Couldn't load its decks\./)).toBeInTheDocument();
 
 		backend.failing = [];
 		await page.getByRole('button', { name: 'Retry' }).click();
@@ -90,7 +90,7 @@ describe('CardPanel', () => {
 				printed_text: 'Der Blitzschlag fügt einem Ziel deiner Wahl 3 Schadenspunkte zu.'
 			}
 		);
-		render(CardPanel, { card: german, view: cardsView() });
+		await render(CardPanel, { card: german, view: cardsView() });
 
 		await expect.element(page.getByRole('heading', { name: 'Blitzschlag' })).toBeInTheDocument();
 		await expect.element(page.getByText(/3 Schadenspunkte/)).toBeInTheDocument();
