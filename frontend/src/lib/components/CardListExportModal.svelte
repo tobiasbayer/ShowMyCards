@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { notifications } from '#lib';
-	import { formatExportLines, type CardListExportChoice } from '#lib/utils/card-list-export.ts';
+	import {
+		formatExportLines,
+		withoutExpansions,
+		type CardListExportChoice
+	} from '#lib/utils/card-list-export.ts';
 	import { copyText } from '#lib/utils/clipboard.ts';
 	import { Copy } from '@lucide/svelte';
 	import Modal from './Modal.svelte';
@@ -10,25 +14,29 @@
 		onClose: () => void;
 		/** What to export, e.g. "Only missing" and "All cards". The first opens; one hides the switch. */
 		choices: CardListExportChoice[];
+		/** Offer "Pin printings", checked by default; unchecked, lines are names only. */
+		pinnable?: boolean;
 		title?: string;
 	}
 
-	let { open, onClose, choices, title = 'Export card list' }: Props = $props();
+	let { open, onClose, choices, pinnable = false, title = 'Export card list' }: Props = $props();
 
 	const uid = $props.id();
 
-	// Opens on the first choice every time; reset on close rather than persisted.
+	// Opens on the first choice, pinned, every time; reset on close rather than persisted.
 	let selected = $state(0);
+	let pinned = $state(true);
 	let textarea = $state<HTMLTextAreaElement>();
 
 	const choice = $derived(choices[selected] ?? choices[0]);
-	const current = $derived(choice.export);
+	const current = $derived(pinnable && !pinned ? withoutExpansions(choice.export) : choice.export);
 	const text = $derived(formatExportLines(current.lines));
 	const cardCount = $derived(current.lines.reduce((sum, line) => sum + line.quantity, 0));
 	const hasExpansions = $derived(current.lines.some((line) => line.expansion));
 
 	function close() {
 		selected = 0;
+		pinned = true;
 		onClose();
 	}
 
@@ -45,17 +53,27 @@
 
 <Modal {open} onClose={close} {title} boxClass="max-w-xl">
 	<div class="space-y-4">
-		{#if choices.length > 1}
-			<div class="join" role="radiogroup" aria-label="Cards to export">
-				{#each choices as option, index (option.label)}
-					<input
-						type="radio"
-						name="{uid}-choice"
-						class="join-item btn btn-sm"
-						aria-label={option.label}
-						value={index}
-						bind:group={selected} />
-				{/each}
+		{#if choices.length > 1 || pinnable}
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				{#if choices.length > 1}
+					<div class="join" role="radiogroup" aria-label="Cards to export">
+						{#each choices as option, index (option.label)}
+							<input
+								type="radio"
+								name="{uid}-choice"
+								class="join-item btn btn-sm"
+								aria-label={option.label}
+								value={index}
+								bind:group={selected} />
+						{/each}
+					</div>
+				{/if}
+				{#if pinnable}
+					<label class="label cursor-pointer gap-2 text-sm">
+						<input type="checkbox" class="checkbox checkbox-sm" bind:checked={pinned} />
+						Pin printings
+					</label>
+				{/if}
 			</div>
 		{/if}
 

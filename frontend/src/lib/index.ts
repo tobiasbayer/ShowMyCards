@@ -188,11 +188,18 @@ export { getActionError, getActionMessage } from './utils/form-actions';
 export { scryfallImageUrl } from './utils/scryfall-image';
 export { buildDeckItems } from './utils/deck-add';
 export type { AddToDeckCard, BuildDeckItemsOptions } from './utils/deck-add';
-export { deckExportLines, listExportLines, formatExportLines } from './utils/card-list-export';
+export {
+	deckExportLines,
+	listExportLines,
+	printingExportLines,
+	withoutExpansions,
+	formatExportLines
+} from './utils/card-list-export';
 export type {
 	CardListExport,
 	CardListExportChoice,
 	CardListExportLine,
 	CardListExportMode,
-	DeckExportItems
+	DeckExportItems,
+	PrintingExportItem
 } from './utils/card-list-export';

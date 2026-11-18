@@ -156,4 +156,63 @@ describe('CardListExportModal', () => {
 			.element(page.getByText('Expansions Cardmarket names differently', { exact: false }))
 			.not.toBeInTheDocument();
 	});
+
+	it('offers no Pin printings checkbox unless asked to', async () => {
+		await render(CardListExportModal, {
+			open: true,
+			onClose: () => {},
+			choices: missingOrAll(pinned)
+		});
+
+		await expect.element(exported()).toBeVisible();
+		await expect.element(page.getByRole('checkbox')).not.toBeInTheDocument();
+	});
+
+	describe('for selected printings', () => {
+		const printings: CardListExport = {
+			lines: [
+				{ quantity: 1, name: 'Lightning Bolt', expansion: 'Double Masters' },
+				{ quantity: 2, name: 'Lightning Bolt', expansion: 'Magic 2011' }
+			],
+			skipped: 0
+		};
+
+		it('pins printings by default and merges them by name when unpinned', async () => {
+			await render(CardListExportModal, {
+				open: true,
+				onClose: () => {},
+				choices: [{ label: '1 of each', export: printings }],
+				pinnable: true
+			});
+
+			const pin = page.getByRole('checkbox', { name: 'Pin printings' });
+			await expect.element(pin).toBeChecked();
+			await expect
+				.element(exported())
+				.toHaveValue('1 Lightning Bolt (Double Masters)\n2 Lightning Bolt (Magic 2011)');
+
+			await pin.click();
+
+			await expect.element(exported()).toHaveValue('3 Lightning Bolt');
+			await expect
+				.element(page.getByText('Expansions Cardmarket names differently', { exact: false }))
+				.not.toBeInTheDocument();
+		});
+
+		it('reopens pinned after closing', async () => {
+			const { rerender } = await render(CardListExportModal, {
+				open: true,
+				onClose: () => {},
+				choices: [{ label: '1 of each', export: printings }],
+				pinnable: true
+			});
+
+			await page.getByRole('checkbox', { name: 'Pin printings' }).click();
+			await userEvent.click(page.getByRole('button', { name: 'Close', exact: true }));
+			await rerender({ open: false });
+			await rerender({ open: true });
+
+			await expect.element(page.getByRole('checkbox', { name: 'Pin printings' })).toBeChecked();
+		});
+	});
 });

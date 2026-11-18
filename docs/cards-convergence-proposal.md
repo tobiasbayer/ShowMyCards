@@ -850,3 +850,39 @@ The user asked to promote the Cards page to production on this branch: delete th
 - Frontend: svelte-check 0 errors and 0 warnings; eslint and prettier clean; 451 Vitest tests pass (34 files); `bun run build` succeeds.
 - Backend: `go vet` clean; `go test ./...` passes; golangci-lint at its baseline (58). `make types` reproduces the merged generated types exactly.
 - Not verified: the page in a browser after the merge.
+
+# Follow-up: export selected cards (2026-11-18)
+
+`feat/card-list-export` (the upstream PR for exporting decks and lists in Cardmarket's Wants-list syntax) is merged into this branch (`802fc9c`). The user asked for the same dialog in the selection bar, next to Move to, Add to deck and Re-sort.
+
+**Decisions the user made:**
+- **Quantities:** like Add to deck. Collection scopes switch between **All selected (N)** (the copies in scope, the default) and **1 of each**. All cards has no switch and exports 1 of each, unowned cards included.
+- **Expansion:** a **Pin printings** checkbox, on by default. Checked, each line names the printing's expansion (`2 Lightning Bolt (Magic 2011)`). Unchecked, lines are names only, merged by name. This is for the Cards page only; decks and lists keep "pinned rows always name their expansion, no switch".
+- **Git:** merge the feature branch rather than cherry-pick it.
+
+**Semantics:**
+- Names are `card.name`: Scryfall's English Oracle name, with double-faced and split cards in full (`Fire // Ice`), which Cardmarket matches. They are not the printed name in the page's language.
+- Two selected printings from the same expansion share a line, as do the finishes of one printing.
+- Export changes nothing, so the selection stays after Copy. Esc closes the dialog and leaves the selection, which the bar counts in `ui.openPopovers` like its other dialogs.
+
+**Files:**
+- `CardListExportModal.svelte` takes `choices` (label, export, empty text; the first opens, and a single choice hides the switch). That part is in the upstream PR (`8c53b27`, merged here as `ea3a1c4`); the deck and list pages pass "Only missing" / "All cards". This branch adds `pinnable`.
+- `card-list-export.ts` gains `printingExportLines` and `withoutExpansions`.
+- `cards/SelectionBar.svelte` gains the Export button (`ClipboardCopy`) and mounts the dialog.
+
+**Differs from the upstream PR only by the Pin printings option:** `pinnable` in `CardListExportModal.svelte` and its spec, and `printingExportLines`/`withoutExpansions` in `card-list-export.ts`. If upstream squash-merges the PR and `main` is merged back here, those spots may conflict; keep this branch's side.
+
+**Verified** in Chrome with real clicks, against the real database (this branch's backend on 3100, frontend on 5174):
+- **Location A1:** Select all, then Export, opened on "All selected (11)" with Pin printings checked.
+  - The Spanish, German and English Appa printings merged into `4 Appa, Loyal Sky Bison (Avatar: The Last Airbender)`.
+  - The German "Rat der Nebelwiesen" was exported as `4 Mistmeadow Council (Lorwyn Eclipsed)`.
+- **Switching:** with Pin printings unchecked, the lines were names only and the expansion hint was gone. "1 of each" gave `3 Appa, Loyal Sky Bison`, one per selected printing.
+- **Copy and Esc:** Copy showed "Copied 3 lines to the clipboard". Esc closed the dialog and kept the 5 selected.
+- **All cards, German:** the unowned "Geheimnisstöberer" exported as `1 Delver of Secrets // Insectile Aberration (Innistrad: Midnight Hunt)`. There was no switch. Move to and Re-sort stayed disabled.
+- **Deck page:** unchanged. "Only missing" showed "Nothing missing", and "All cards" showed the pinned Appa rows with their expansion.
+- No console errors.
+
+**Checks:**
+- svelte-check: 0 errors and 0 warnings. eslint and prettier are clean.
+- The client project passes 101/101 three runs in a row.
+- Full `bun run test` runs (503 tests) lose 2–3 browser tests to Vitest harness errors ("Cannot find vitest-iframe", "Frame was detached"). They hit different files on each run, and the branch without this change fails the same way (490/493, twice).

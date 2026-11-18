@@ -5,6 +5,8 @@ import {
 	deckExportLines,
 	formatExportLines,
 	listExportLines,
+	printingExportLines,
+	withoutExpansions,
 	type DeckExportItems
 } from './card-list-export';
 
@@ -242,6 +244,57 @@ describe('listExportLines', () => {
 		expect(listExportLines(items, 'all')).toEqual({
 			lines: [{ quantity: 1, name: 'Lightning Bolt', expansion: 'Magic 2010' }],
 			skipped: 1
+		});
+	});
+});
+
+describe('printingExportLines', () => {
+	it('merges copies of the same expansion and keeps other expansions apart, sorted', () => {
+		expect(
+			printingExportLines([
+				{ name: 'Lightning Bolt', expansion: 'Magic 2011', quantity: 2 },
+				{ name: 'Counterspell', expansion: 'Ice Age', quantity: 1 },
+				{ name: 'Lightning Bolt', expansion: 'Double Masters', quantity: 1 },
+				{ name: 'Lightning Bolt', expansion: 'Magic 2011', quantity: 1 }
+			])
+		).toEqual({
+			lines: [
+				{ quantity: 1, name: 'Counterspell', expansion: 'Ice Age' },
+				{ quantity: 1, name: 'Lightning Bolt', expansion: 'Double Masters' },
+				{ quantity: 3, name: 'Lightning Bolt', expansion: 'Magic 2011' }
+			],
+			skipped: 0
+		});
+	});
+
+	it('leaves out printings with nothing to export and writes a missing expansion by name only', () => {
+		expect(
+			printingExportLines([
+				{ name: 'Counterspell', expansion: 'Ice Age', quantity: 0 },
+				{ name: 'Lightning Bolt', expansion: '', quantity: 1 }
+			]).lines
+		).toEqual([{ quantity: 1, name: 'Lightning Bolt' }]);
+	});
+});
+
+describe('withoutExpansions', () => {
+	it('merges every expansion of a card into one name-only line, keeping the skipped count', () => {
+		expect(
+			withoutExpansions({
+				lines: [
+					{ quantity: 1, name: 'Fire // Ice' },
+					{ quantity: 1, name: 'Lightning Bolt' },
+					{ quantity: 1, name: 'Lightning Bolt', expansion: 'Double Masters' },
+					{ quantity: 2, name: 'Lightning Bolt', expansion: 'Magic 2011' }
+				],
+				skipped: 2
+			})
+		).toEqual({
+			lines: [
+				{ quantity: 1, name: 'Fire // Ice' },
+				{ quantity: 4, name: 'Lightning Bolt' }
+			],
+			skipped: 2
 		});
 	});
 });

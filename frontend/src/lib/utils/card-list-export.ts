@@ -143,6 +143,28 @@ export function listExportLines(
 	return { lines: lines.sorted(), skipped: items.length - named.length };
 }
 
+/** A printing to export with a given quantity, e.g. a card selected on the Cards page. */
+export interface PrintingExportItem {
+	name: string;
+	/** The printing's expansion (set) name. */
+	expansion?: string;
+	quantity: number;
+}
+
+/** Export specific printings: one line per card and expansion, quantities summed. */
+export function printingExportLines(items: PrintingExportItem[]): CardListExport {
+	const lines = createLines();
+	for (const item of items) lines.add(item.name, item.expansion || undefined, item.quantity);
+	return { lines: lines.sorted(), skipped: 0 };
+}
+
+/** The same export with every expansion dropped, so any printing will do: one line per name. */
+export function withoutExpansions(exported: CardListExport): CardListExport {
+	const lines = createLines();
+	for (const line of exported.lines) lines.add(line.name, undefined, line.quantity);
+	return { lines: lines.sorted(), skipped: exported.skipped };
+}
+
 /** One option of the export dialog's switch, e.g. "Only missing" or "All cards". */
 export interface CardListExportChoice {
 	label: string;

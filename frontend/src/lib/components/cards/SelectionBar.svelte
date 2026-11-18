@@ -1,15 +1,25 @@
 <!--
 	Floating bar for the checked tiles: the count, Select all, Move to, Add to
-	deck, Re-sort, Delete and Clear. Actions touch the copies in the current
-	scope, the ones the tiles' owned badges count.
+	deck, Re-sort, Export, Delete and Clear. Actions touch the copies in the
+	current scope, the ones the tiles' owned badges count.
 -->
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { fly } from 'svelte/transition';
 	import { getDisplayName, Modal, type InventoryCard } from '#lib';
 	import AddToDeckModal from '#lib/components/AddToDeckModal.svelte';
+	import CardListExportModal from '#lib/components/CardListExportModal.svelte';
+	import { printingExportLines, type CardListExportChoice } from '#lib/utils/card-list-export.ts';
 	import type { AddToDeckCard } from '#lib/utils/deck-add.ts';
-	import { Check, CheckCheck, LayersPlus, RefreshCw, Trash2, X } from '@lucide/svelte';
+	import {
+		Check,
+		CheckCheck,
+		ClipboardCopy,
+		LayersPlus,
+		RefreshCw,
+		Trash2,
+		X
+	} from '@lucide/svelte';
 	import MoveMenu from './MoveMenu.svelte';
 	import { plural } from './format';
 	import { ui } from './live.svelte';
@@ -22,6 +32,7 @@
 	let running = $state(false);
 	let confirmingDelete = $state(false);
 	let addingToDeck = $state(false);
+	let exporting = $state(false);
 
 	const cards = $derived(view.checkedCards);
 	const inCollection = $derived(view.source === 'collection');
@@ -81,9 +92,23 @@
 		}))
 	);
 
+	// Export lines use the English Oracle name (full "Front // Back"), which Cardmarket
+	// matches, not the printed name in the page's language. Collection scopes offer the
+	// copies in scope or 1 of each, like Add to deck; All cards exports 1 of each.
+	const exportChoices = $derived.by<CardListExportChoice[]>(() => {
+		const lines = (quantity: (card: InventoryCard) => number) =>
+			printingExportLines(
+				cards.map((c) => ({ name: c.name, expansion: c.set_name, quantity: quantity(c) }))
+			);
+		const oneOfEach = { label: '1 of each', export: lines(() => 1) };
+		return inCollection
+			? [{ label: `All selected (${copies})`, export: lines(copiesOf) }, oneOfEach]
+			: [oneOfEach];
+	});
+
 	// While a dialog is open, Esc closes it, not the selection or the detail panel.
 	// The counter is written untracked: reading it here would re-run this effect.
-	const dialogOpen = $derived(confirmingDelete || addingToDeck);
+	const dialogOpen = $derived(confirmingDelete || addingToDeck || exporting);
 	$effect(() => {
 		if (!dialogOpen) return;
 		untrack(() => ui.openPopovers++);
@@ -92,8 +117,9 @@
 
 	// The Add-to-deck dialog closes itself on Esc, and skips an Esc handled inside it.
 	function onKeydown(event: KeyboardEvent) {
-		if (event.key !== 'Escape' || event.defaultPrevented || running) return;
-		confirmingDelete = false;
+		if (event.key !== 'Escape' || event.defaultPrevented) return;
+		exporting = false;
+		if (!running) confirmingDelete = false;
 	}
 
 	/** Runs an action on the checked cards; the selection clears once it succeeds. */
@@ -185,6 +211,16 @@
 		</button>
 		<button
 			type="button"
+			class="btn btn-ghost btn-sm rounded-full"
+			title="Export card list"
+			aria-label="Export selected cards"
+			disabled={running}
+			onclick={() => (exporting = true)}>
+			<ClipboardCopy class="size-4" />
+			<span class="hidden sm:inline">Export</span>
+		</button>
+		<button
+			type="button"
 			class="btn btn-ghost btn-sm rounded-full text-error"
 			title="Delete"
 			aria-label="Delete selected copies"
@@ -235,4 +271,13 @@
 		pinByDefault={cards.length > 0 && cards.every((c) => ownedCount(c) > 0)}
 		onClose={() => (addingToDeck = false)}
 		onAdded={onDeckAdded} />
+{/if}
+
+{#if exporting}
+	<CardListExportModal
+		open
+		pinnable
+		title="Export selected cards"
+		choices={exportChoices}
+		onClose={() => (exporting = false)} />
 {/if}
