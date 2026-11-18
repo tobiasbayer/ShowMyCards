@@ -2,8 +2,10 @@ package services
 
 import (
 	"backend/models"
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 
 	"gorm.io/gorm"
 )
@@ -57,6 +59,94 @@ type AvailabilityMap struct {
 	pinnedByScryfall map[string]int
 	// printingsByOracle maps oracle_id -> the owned printings of that card.
 	printingsByOracle map[string][]string
+	// demandRows maps oracle_id -> demand-zone quantities per deck and pinned
+	// printing, so Conflicts can name the decks behind an over-commitment.
+	demandRows map[string][]demandRow
+}
+
+// demandRow is one deck's demand-zone quantity for one Oracle and pinned
+// printing ("" = any printing).
+type demandRow struct {
+	OracleID   string
+	ScryfallID string
+	DeckID     uint
+	DeckName   string
+	Quantity   int
+}
+
+// Conflict explains one cause of an Oracle's over-commitment.
+type Conflict struct {
+	// ScryfallID is the over-subscribed pinned printing, or "" when the decks
+	// together want more copies of the card than are owned.
+	ScryfallID string
+	Owned      int
+	Wanted     int
+	// Decks lists the decks that want the card (or pin the printing), by name.
+	Decks []DeckDemand
+}
+
+// DeckDemand is one deck's share of a Conflict's wanted copies.
+type DeckDemand struct {
+	DeckID   uint
+	DeckName string
+	Quantity int
+}
+
+// Conflicts explains why an Oracle is over-committed: one entry when the decks
+// together want more copies than are owned, then one entry per pinned printing
+// that decks want more often than it is owned (by scryfall_id). It returns nil
+// when the Oracle is not over-committed.
+func (m AvailabilityMap) Conflicts(oracleID string) []Conflict {
+	a := m.OracleAvailabilityFor(oracleID)
+	rows := m.demandRows[oracleID]
+	var conflicts []Conflict
+
+	if a.Demand > a.Owned {
+		conflicts = append(conflicts, Conflict{
+			Owned:  a.Owned,
+			Wanted: a.Demand,
+			Decks:  demandByDeck(rows, func(demandRow) bool { return true }),
+		})
+	}
+
+	var pinned []string
+	for _, row := range rows {
+		if row.ScryfallID != "" && !slices.Contains(pinned, row.ScryfallID) &&
+			m.pinnedByScryfall[row.ScryfallID] > m.ownedByScryfall[row.ScryfallID] {
+			pinned = append(pinned, row.ScryfallID)
+		}
+	}
+	slices.Sort(pinned)
+	for _, scryfallID := range pinned {
+		conflicts = append(conflicts, Conflict{
+			ScryfallID: scryfallID,
+			Owned:      m.ownedByScryfall[scryfallID],
+			Wanted:     m.pinnedByScryfall[scryfallID],
+			Decks:      demandByDeck(rows, func(r demandRow) bool { return r.ScryfallID == scryfallID }),
+		})
+	}
+
+	return conflicts
+}
+
+// demandByDeck sums the matching rows per deck, sorted by deck name, then ID.
+func demandByDeck(rows []demandRow, match func(demandRow) bool) []DeckDemand {
+	var decks []DeckDemand
+	for _, row := range rows {
+		if !match(row) {
+			continue
+		}
+		i := slices.IndexFunc(decks, func(d DeckDemand) bool { return d.DeckID == row.DeckID })
+		if i < 0 {
+			decks = append(decks, DeckDemand{DeckID: row.DeckID, DeckName: row.DeckName})
+			i = len(decks) - 1
+		}
+		decks[i].Quantity += row.Quantity
+	}
+	slices.SortFunc(decks, func(a, b DeckDemand) int {
+		return cmp.Or(cmp.Compare(a.DeckName, b.DeckName), cmp.Compare(a.DeckID, b.DeckID))
+	})
+	return decks
 }
 
 // OracleAvailabilityFor returns the availability for an Oracle ID. Oracle IDs
@@ -106,6 +196,7 @@ func (s *AllocationService) ComputeAvailability(ctx context.Context) (Availabili
 		ownedByScryfall:   make(map[string]int),
 		pinnedByScryfall:  make(map[string]int),
 		printingsByOracle: make(map[string][]string),
+		demandRows:        make(map[string][]demandRow),
 	}
 
 	// Owned: aggregate inventory quantities by oracle_id and by scryfall_id.
@@ -136,18 +227,16 @@ func (s *AllocationService) ComputeAvailability(ctx context.Context) (Availabili
 		}
 	}
 
-	// Demand: aggregate deck_items in demand zones (maybe excluded) by oracle_id
-	// and by pinned scryfall_id.
-	type demandRow struct {
-		OracleID   string
-		ScryfallID string
-		Quantity   int
-	}
+	// Demand: aggregate deck_items in demand zones (maybe excluded) by oracle_id,
+	// pinned scryfall_id and deck. The per-deck rows only feed Conflicts; the
+	// totals below sum them back up.
 	var demandRows []demandRow
 	if err := db.Model(&models.DeckItem{}).
-		Select("oracle_id, scryfall_id, SUM(desired_quantity) AS quantity").
-		Where("zone IN ?", demandZones()).
-		Group("oracle_id, scryfall_id").
+		Select("deck_items.oracle_id, deck_items.scryfall_id, deck_items.deck_id, "+
+			"COALESCE(decks.name, '') AS deck_name, SUM(deck_items.desired_quantity) AS quantity").
+		Joins("LEFT JOIN decks ON decks.id = deck_items.deck_id").
+		Where("deck_items.zone IN ?", demandZones()).
+		Group("deck_items.oracle_id, deck_items.scryfall_id, deck_items.deck_id, decks.name").
 		Scan(&demandRows).Error; err != nil {
 		return AvailabilityMap{}, fmt.Errorf("aggregating deck demand: %w", err)
 	}
@@ -162,6 +251,7 @@ func (s *AllocationService) ComputeAvailability(ctx context.Context) (Availabili
 		a.OracleID = row.OracleID
 		a.Demand += row.Quantity
 		result.Oracle[row.OracleID] = a
+		result.demandRows[row.OracleID] = append(result.demandRows[row.OracleID], row)
 
 		// Pinned printings compete for a specific printing's pool.
 		if row.ScryfallID != "" {

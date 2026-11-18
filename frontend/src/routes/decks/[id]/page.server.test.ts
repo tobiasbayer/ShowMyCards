@@ -11,7 +11,8 @@ const items = {
 	side: [],
 	maybe: [],
 	aggregate_shortfall: 0,
-	aggregate_over_committed: 0
+	aggregate_over_committed: 0,
+	shared_cards: []
 };
 const legality = [{ format: 'modern', name: 'Modern', legal: true, reasons: [] }];
 
