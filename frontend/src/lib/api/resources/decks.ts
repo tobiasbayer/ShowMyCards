@@ -26,17 +26,23 @@ export const decksApi = {
 
 	/**
 	 * Add cards to a deck; a card already in it gets its quantity raised. Throws
-	 * with the route's message when that fails.
+	 * with the route's message when that fails. Resolves to the zones the server
+	 * stored the cards in: tokens and other extras always go to "other", whatever
+	 * zone was asked for. Empty when the route doesn't say.
 	 */
-	addItems: async (deckId: number, items: CreateDeckItemRequest[]): Promise<void> => {
+	addItems: async (deckId: number, items: CreateDeckItemRequest[]): Promise<string[]> => {
 		const response = await fetch(`/decks/${deckId}/items`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ items })
 		});
+		const body = (await response.json().catch(() => ({}))) as {
+			error?: string;
+			zones?: unknown;
+		};
 		if (!response.ok) {
-			const body = (await response.json().catch(() => ({}))) as { error?: string };
 			throw new Error(body.error ?? 'Failed to add to deck');
 		}
+		return Array.isArray(body.zones) ? (body.zones as string[]) : [];
 	}
 };

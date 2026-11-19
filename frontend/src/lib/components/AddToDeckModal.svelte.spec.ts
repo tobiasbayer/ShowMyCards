@@ -29,9 +29,10 @@ interface CopyInfo {
 
 /**
  * Route the deck list (via the /api proxy), the add endpoint and, when given,
- * the card's availability and deck usage to canned responses.
+ * the card's availability and deck usage to canned responses. storedZones is
+ * what the add endpoint reports the server stored.
  */
-function mockBackend(decks: DeckSummary[], copyInfo?: CopyInfo) {
+function mockBackend(decks: DeckSummary[], copyInfo?: CopyInfo, storedZones?: string[]) {
 	fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 		const url = String(input);
 		if (url.endsWith('/api/decks') && init?.method === 'POST') {
@@ -42,7 +43,7 @@ function mockBackend(decks: DeckSummary[], copyInfo?: CopyInfo) {
 			return new Response(JSON.stringify(decks), { status: 200 });
 		}
 		if (/\/decks\/\d+\/items$/.test(url)) {
-			return new Response(JSON.stringify({ success: true }), { status: 200 });
+			return new Response(JSON.stringify({ success: true, zones: storedZones }), { status: 200 });
 		}
 		if (copyInfo && /\/api\/inventory\/availability\/[^/]+$/.test(url)) {
 			return new Response(JSON.stringify(copyInfo.availability), { status: 200 });
@@ -188,6 +189,17 @@ describe('AddToDeckModal', () => {
 		await page.getByRole('button', { name: 'New' }).click();
 
 		await expect.element(page.getByRole('button', { name: 'Add to deck' })).toBeDisabled();
+	});
+
+	it('reports the zone the server stored, e.g. Other for a token', async () => {
+		mockBackend([deck(7, 'Rabbits')], undefined, ['other']);
+		const success = vi.spyOn(notifications, 'success');
+		const rabbit = { oracle_id: 'rabbit', scryfall_id: 'tblb-1', name: 'Rabbit', copies: 1 };
+		await render(AddToDeckModal, { open: true, cards: [rabbit], onClose: vi.fn() });
+
+		await page.getByRole('button', { name: 'Add to deck' }).click();
+
+		await vi.waitFor(() => expect(success).toHaveBeenCalledWith('Added Rabbit to Rabbits (Other)'));
 	});
 
 	it('preselects the last deck used', async () => {

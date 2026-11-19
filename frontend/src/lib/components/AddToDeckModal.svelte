@@ -43,6 +43,14 @@
 		{ value: 'maybe', label: 'Maybe' }
 	];
 
+	// Tokens and other extras are stored in Other whatever zone was picked, so the
+	// success message names the zones the server reports, not the picked one.
+	function storedZonesLabel(stored: string[]): string {
+		const zones = stored.length > 0 ? stored : [zone];
+		return zones
+			.map((z) => ZONES.find((o) => o.value === z)?.label ?? (z === 'other' ? 'Other' : z))
+			.join(', ');
+	}
 	let zone = $state<DeckZone>('main');
 	let qty = $state(1);
 	let copiesMode = $state<'copies' | 'one'>('copies');
@@ -130,9 +138,9 @@
 			const deck = await choice.target();
 			if (!deck) return;
 
-			await decksApi.addItems(deck.id, items);
+			const storedZones = await decksApi.addItems(deck.id, items);
 			choice.remember(deck);
-			const zoneLabel = ZONES.find((z) => z.value === zone)?.label ?? zone;
+			const zoneLabel = storedZonesLabel(storedZones);
 			const added = single
 				? `Added ${qty > 1 ? `${qty}× ` : ''}${single.name} to ${deck.name} (${zoneLabel})`
 				: `Added ${items.length} card${items.length === 1 ? '' : 's'} to ${deck.name} (${zoneLabel})`;
