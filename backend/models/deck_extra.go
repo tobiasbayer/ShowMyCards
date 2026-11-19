@@ -12,8 +12,10 @@ import (
 
 // A deck extra is a non-playable object that travels with a paper deck but is
 // never one of its cards: tokens, emblems, helper cards (The Monarch, Day/Night,
-// Dungeons, ...), art cards, Jumpstart front cards, and planes, schemes and
-// vanguards. Extras always live in ZoneOther and count as items, not cards.
+// counter and marker cards such as Poison Counter or Experience, Dungeons, ...),
+// art cards, Jumpstart front cards, and planes, schemes and vanguards. Extras
+// always live in ZoneOther, count as items rather than cards, and are ignored by
+// the format legality check.
 
 var (
 	// ErrExtraOutsideOther rejects putting a token or other extra into a card zone.

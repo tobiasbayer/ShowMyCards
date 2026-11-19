@@ -490,6 +490,9 @@ func TestCheck_IgnoresNonDeckCards(t *testing.T) {
 	poison := card("Poison Counter", layout(scryfall.LayoutNormal), typeLine("Card"), notLegalAnywhere)
 	artCard := card("Sol Ring // Sol Ring", layout(scryfall.LayoutArtSeries), typeLine("Card // Card"), notLegalAnywhere)
 	themeCard := card("Dragons", layout(scryfall.Layout("front_card")), typeLine("Card"), notLegalAnywhere)
+	// Deck extras by the same definition as the deck's Other zone (models.IsDeckExtra).
+	plane := card("Llanowar", layout(scryfall.LayoutPlanar), typeLine("Plane — Dominaria"), notLegalAnywhere)
+	dungeon := card("Undercity", layout(scryfall.LayoutNormal), typeLine("Dungeon — Undercity"), notLegalAnywhere)
 
 	t.Run("constructed", func(t *testing.T) {
 		results := newDeck().
@@ -508,6 +511,8 @@ func TestCheck_IgnoresNonDeckCards(t *testing.T) {
 			add(poison, models.ZoneMain, 1).
 			add(artCard, models.ZoneMain, 1).
 			add(themeCard, models.ZoneMain, 1).
+			add(plane, models.ZoneMain, 1).
+			add(dungeon, models.ZoneMain, 1).
 			add(emblem, models.ZoneSide, 1).
 			check()
 		expect(t, results, "commander")
