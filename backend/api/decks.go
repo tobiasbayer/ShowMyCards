@@ -536,12 +536,12 @@ func (h *DeckHandler) ListItems(c fiber.Ctx) error {
 }
 
 // sharedCards explains the deck's over-committed Oracles: each card's name (from
-// its first demand-zone item) and the allocation conflicts behind the flag, with
+// its first card-zone item) and the allocation conflicts behind the flag, with
 // set, number and language for pinned printings. Sorted by name; never nil.
 func (h *DeckHandler) sharedCards(ctx context.Context, oracleIDs []string, items []EnrichedDeckItem, availability services.AvailabilityMap) []SharedCard {
 	names := make(map[string]string)
 	for _, item := range items {
-		if _, ok := names[item.OracleID]; !ok && item.Zone.CountsAsDemand() {
+		if _, ok := names[item.OracleID]; !ok && item.Zone.CountsAsCards() {
 			names[item.OracleID] = item.Name
 		}
 	}

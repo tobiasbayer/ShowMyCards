@@ -30,7 +30,7 @@ func createDeckTestToken(t *testing.T, db *gorm.DB, scryfallID, oracleID, name s
 	}
 }
 
-func seedZonedDeckItem(t *testing.T, db *gorm.DB, deckID uint, oracleID, scryfallID string, zone models.DeckZone, qty int) models.DeckItem {
+func seedPinnedDeckItem(t *testing.T, db *gorm.DB, deckID uint, oracleID, scryfallID string, zone models.DeckZone, qty int) models.DeckItem {
 	t.Helper()
 	item := models.DeckItem{DeckID: deckID, OracleID: oracleID, ScryfallID: scryfallID, Zone: zone, DesiredQuantity: qty}
 	if err := db.Create(&item).Error; err != nil {
@@ -131,8 +131,8 @@ func TestDeckUpdateItem_ExtraZoneRules(t *testing.T) {
 	deck := createTestDeck(t, db, "Rabbits")
 	createDeckTestToken(t, db, "scry-rabbit", "oracle-rabbit", "Rabbit")
 	createDeckTestCard(t, db, "scry-bolt", "oracle-bolt", "Lightning Bolt", "lea", "common")
-	token := seedZonedDeckItem(t, db, deck.ID, "oracle-rabbit", "scry-rabbit", models.ZoneOther, 1)
-	card := seedZonedDeckItem(t, db, deck.ID, "oracle-bolt", "scry-bolt", models.ZoneMain, 1)
+	token := seedPinnedDeckItem(t, db, deck.ID, "oracle-rabbit", "scry-rabbit", models.ZoneOther, 1)
+	card := seedPinnedDeckItem(t, db, deck.ID, "oracle-bolt", "scry-bolt", models.ZoneMain, 1)
 
 	main, other := models.ZoneMain, models.ZoneOther
 	qty := 3
@@ -162,8 +162,8 @@ func TestDeckMoveItem_ExtraZoneRules(t *testing.T) {
 	deck := createTestDeck(t, db, "Rabbits")
 	createDeckTestToken(t, db, "scry-rabbit", "oracle-rabbit", "Rabbit")
 	createDeckTestCard(t, db, "scry-bolt", "oracle-bolt", "Lightning Bolt", "lea", "common")
-	token := seedZonedDeckItem(t, db, deck.ID, "oracle-rabbit", "scry-rabbit", models.ZoneOther, 2)
-	card := seedZonedDeckItem(t, db, deck.ID, "oracle-bolt", "scry-bolt", models.ZoneMain, 2)
+	token := seedPinnedDeckItem(t, db, deck.ID, "oracle-rabbit", "scry-rabbit", models.ZoneOther, 2)
+	card := seedPinnedDeckItem(t, db, deck.ID, "oracle-bolt", "scry-bolt", models.ZoneMain, 2)
 
 	for name, tc := range map[string]struct {
 		item models.DeckItem
@@ -192,18 +192,18 @@ func TestDeckTokens_CountedSeparatelyFromCards(t *testing.T) {
 	// Cards: deck A wants 4 bolts and owns them all.
 	createDeckTestCard(t, db, "scry-bolt", "oracle-bolt", "Lightning Bolt", "lea", "common")
 	addDeckInventory(t, db, "oracle-bolt", "scry-bolt", 4)
-	seedZonedDeckItem(t, db, deckA.ID, "oracle-bolt", "scry-bolt", models.ZoneMain, 4)
+	seedPinnedDeckItem(t, db, deckA.ID, "oracle-bolt", "scry-bolt", models.ZoneMain, 4)
 
 	// Rabbit tokens: deck A wants 3 but only 1 is owned (2 missing).
 	createDeckTestToken(t, db, "scry-rabbit", "oracle-rabbit", "Rabbit")
 	addDeckInventory(t, db, "oracle-rabbit", "scry-rabbit", 1)
-	seedZonedDeckItem(t, db, deckA.ID, "oracle-rabbit", "scry-rabbit", models.ZoneOther, 3)
+	seedPinnedDeckItem(t, db, deckA.ID, "oracle-rabbit", "scry-rabbit", models.ZoneOther, 3)
 
 	// Food token: 1 owned, wanted once by each deck (over-committed across decks).
 	createDeckTestToken(t, db, "scry-food", "oracle-food", "Food")
 	addDeckInventory(t, db, "oracle-food", "scry-food", 1)
-	seedZonedDeckItem(t, db, deckA.ID, "oracle-food", "scry-food", models.ZoneOther, 1)
-	seedZonedDeckItem(t, db, deckB.ID, "oracle-food", "scry-food", models.ZoneOther, 1)
+	seedPinnedDeckItem(t, db, deckA.ID, "oracle-food", "scry-food", models.ZoneOther, 1)
+	seedPinnedDeckItem(t, db, deckB.ID, "oracle-food", "scry-food", models.ZoneOther, 1)
 
 	summary := fetchDeckSummaries(t, app)[deckA.ID]
 	if summary.TotalItems != 3 {
@@ -251,7 +251,7 @@ func TestDeckCreateItemsBatch_ReaddedTokenMergesIntoOther(t *testing.T) {
 	app, db := setupDeckTestApp(t)
 	deck := createTestDeck(t, db, "Rabbits")
 	createDeckTestToken(t, db, "scry-rabbit", "oracle-rabbit", "Rabbit")
-	seedZonedDeckItem(t, db, deck.ID, "oracle-rabbit", "scry-rabbit", models.ZoneOther, 2)
+	seedPinnedDeckItem(t, db, deck.ID, "oracle-rabbit", "scry-rabbit", models.ZoneOther, 2)
 
 	resp := postDeckBatch(t, app, deck.ID, []CreateDeckItemRequest{
 		{OracleID: "oracle-rabbit", ScryfallID: "scry-rabbit", Zone: models.ZoneMain, DesiredQuantity: 1},
