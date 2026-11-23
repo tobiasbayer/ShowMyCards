@@ -55,6 +55,7 @@ export { default as RulesTable } from './components/RulesTable.svelte';
 export { default as RuleTester } from './components/RuleTester.svelte';
 export { default as SortableRuleRow } from './components/SortableRuleRow.svelte';
 export { default as ScheduledTaskCard } from './components/ScheduledTaskCard.svelte';
+export { default as JobDetailModal } from './components/JobDetailModal.svelte';
 export { default as ListCard } from './components/ListCard.svelte';
 export { default as DeckCard } from './components/DeckCard.svelte';
 export { default as DeckView } from './components/DeckView.svelte';
@@ -193,6 +194,16 @@ export type { CardWithTreatment, GroupedCardsResult } from './utils/search-resul
 export { getActionError, getActionMessage } from './utils/form-actions';
 export { scryfallImageUrl } from './utils/scryfall-image';
 export { buildDeckItems } from './utils/deck-add';
+export {
+	formatDuration,
+	jobProgress,
+	jobTypeLabel,
+	jobTypeLabels,
+	parseJobMetadata,
+	statusColor,
+	statusText
+} from './utils/jobs';
+export type { JobRecord } from './utils/jobs';
 export type { AddToDeckCard, BuildDeckItemsOptions } from './utils/deck-add';
 export {
 	deckExportLines,
