@@ -194,6 +194,7 @@ export type { CardWithTreatment, GroupedCardsResult } from './utils/search-resul
 export { getActionError, getActionMessage } from './utils/form-actions';
 export { scryfallImageUrl } from './utils/scryfall-image';
 export { buildDeckItems } from './utils/deck-add';
+export { ZONE_LABELS, PICKABLE_ZONES, zonesLabel } from './utils/deck-zones';
 export {
 	formatDuration,
 	jobProgress,

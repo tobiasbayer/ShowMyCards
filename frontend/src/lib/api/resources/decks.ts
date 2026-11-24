@@ -1,5 +1,11 @@
 import { apiClient } from '../client';
-import type { CreateDeckItemRequest, CreateDeckRequest, DeckCardUsage, DeckSummary } from '#lib';
+import type {
+	CreateDeckItemRequest,
+	CreateDeckRequest,
+	DeckCardUsage,
+	DeckSummary,
+	DeckZone
+} from '#lib';
 
 /** A deck as returned by create (BaseModel fields flattened at runtime). */
 export interface CreatedDeck {
@@ -30,7 +36,7 @@ export const decksApi = {
 	 * stored the cards in: tokens and other extras always go to "other", whatever
 	 * zone was asked for. Empty when the route doesn't say.
 	 */
-	addItems: async (deckId: number, items: CreateDeckItemRequest[]): Promise<string[]> => {
+	addItems: async (deckId: number, items: CreateDeckItemRequest[]): Promise<DeckZone[]> => {
 		const response = await fetch(`/decks/${deckId}/items`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -43,6 +49,6 @@ export const decksApi = {
 		if (!response.ok) {
 			throw new Error(body.error ?? 'Failed to add to deck');
 		}
-		return Array.isArray(body.zones) ? (body.zones as string[]) : [];
+		return Array.isArray(body.zones) ? (body.zones as DeckZone[]) : [];
 	}
 };

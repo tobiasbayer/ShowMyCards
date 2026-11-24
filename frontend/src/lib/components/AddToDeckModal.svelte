@@ -4,6 +4,9 @@
 		decksApi,
 		inventoryApi,
 		notifications,
+		PICKABLE_ZONES,
+		ZONE_LABELS,
+		zonesLabel,
 		type DeckAvailability,
 		type DeckCardUsage,
 		type DeckZone
@@ -36,21 +39,6 @@
 
 	const uid = $props.id();
 
-	const ZONES: { value: DeckZone; label: string }[] = [
-		{ value: 'command', label: 'Command' },
-		{ value: 'main', label: 'Main' },
-		{ value: 'side', label: 'Side' },
-		{ value: 'maybe', label: 'Maybe' }
-	];
-
-	// Tokens and other extras are stored in Other whatever zone was picked, so the
-	// success message names the zones the server reports, not the picked one.
-	function storedZonesLabel(stored: string[]): string {
-		const zones = stored.length > 0 ? stored : [zone];
-		return zones
-			.map((z) => ZONES.find((o) => o.value === z)?.label ?? (z === 'other' ? 'Other' : z))
-			.join(', ');
-	}
 	let zone = $state<DeckZone>('main');
 	let qty = $state(1);
 	let copiesMode = $state<'copies' | 'one'>('copies');
@@ -140,7 +128,9 @@
 
 			const storedZones = await decksApi.addItems(deck.id, items);
 			choice.remember(deck);
-			const zoneLabel = storedZonesLabel(storedZones);
+			// Tokens and other extras are stored in Other whatever zone was picked, so
+			// name the zones the server reports, not the picked one.
+			const zoneLabel = zonesLabel(storedZones.length > 0 ? storedZones : [zone]);
 			const added = single
 				? `Added ${qty > 1 ? `${qty}× ` : ''}${single.name} to ${deck.name} (${zoneLabel})`
 				: `Added ${items.length} card${items.length === 1 ? '' : 's'} to ${deck.name} (${zoneLabel})`;
@@ -197,13 +187,13 @@
 		<fieldset class="flex flex-col gap-2">
 			<legend class="mb-2 font-semibold">Zone</legend>
 			<div class="join">
-				{#each ZONES as z (z.value)}
+				{#each PICKABLE_ZONES as z (z)}
 					<input
 						type="radio"
 						name="{uid}-zone"
 						class="join-item btn btn-sm"
-						aria-label={z.label}
-						value={z.value}
+						aria-label={ZONE_LABELS[z]}
+						value={z}
 						bind:group={zone} />
 				{/each}
 			</div>
