@@ -59,8 +59,8 @@ type Result struct {
 
 // Check evaluates the deck against every format, in display order. cards maps
 // Oracle ID to card data; a deck item whose Oracle ID is missing has no local
-// card data and makes the deck not legal anywhere. Maybe-board items are
-// ignored.
+// card data and makes the deck not legal anywhere. Maybe-board and other-zone
+// items are ignored, as are deck extras (models.IsDeckExtra).
 func Check(items []models.DeckItem, cards map[string]scryfall.Card) []Result {
 	d := newDeck(items, cards)
 	results := make([]Result, len(formats))
