@@ -1,8 +1,7 @@
-// The Cards page's language dropdown: which languages it offers and
-// what each scope shows when none was picked.
+// The Cards page's language dropdown: which languages it offers and what is
+// shown when none was picked (every language, in both views).
 
 import { SCRYFALL_LANGUAGES } from '#lib/constants.ts';
-import type { Source } from './view.svelte';
 
 /** "Any language": no filter in the collection, `l:any` on Scryfall. */
 export const ANY_LANGUAGE = 'any';
@@ -20,23 +19,11 @@ export function parseLanguage(value: string | null | undefined): string | null {
 }
 
 /**
- * The language a scope shows when none was picked: every language for the
- * collection, the Settings language for All cards.
+ * The `?lang=` value to keep after a search or a view change: the pick, unless it
+ * is Any, which every view shows anyway.
  */
-export function defaultLanguage(source: Source, settingsLanguage: string): string {
-	return source === 'collection' ? ANY_LANGUAGE : settingsLanguage;
-}
-
-/**
- * The `?lang=` value to keep after a search or scope change: the pick, unless it
- * is what the scope would show anyway.
- */
-export function languageParam(
-	picked: string | null,
-	source: Source,
-	settingsLanguage: string
-): string | null {
-	return picked === null || picked === defaultLanguage(source, settingsLanguage) ? null : picked;
+export function languageParam(picked: string | null): string | null {
+	return picked === null || picked === ANY_LANGUAGE ? null : picked;
 }
 
 export function languageName(code: string): string {

@@ -12,23 +12,22 @@ import { catalogSearch } from '#lib/components/cards/catalog.ts';
 import { ANY_LANGUAGE, parseLanguage } from '#lib/components/cards/language.ts';
 import { parseSort, withOrder } from '#lib/components/cards/sort.ts';
 
-// The cards for the URL's scope and search, the storage locations (scope dropdown,
-// Move and Add) and the Settings language (All cards' default).
+// The cards for the URL's scope and search, and the storage locations (location
+// dropdown, Move and Add).
 export const load: PageServerLoad = async ({ fetch, url }) => {
-	const [storageLocations, defaultLanguage, cards] = await Promise.all([
+	const [storageLocations, cards] = await Promise.all([
 		loadStorageLocations(fetch),
-		loadDefaultLanguage(fetch),
 		loadCards(fetch, url)
 	]);
-	return { storageLocations, defaultLanguage, cards };
+	return { storageLocations, cards };
 };
 
 // Collection scopes run the query (Scryfall syntax) on the backend's local engine
 // over the owned printings in the chosen scope; All cards (`source=catalog`) loads
 // the first Scryfall page for `q`. Every result carries its deck availability (per
 // card, and free copies per owned printing). A picked language (`?lang=`) is added
-// to the query unless the query names one; without a pick the collection shows
-// every language and Scryfall gets the Settings language from the backend. A
+// to the query unless the query names one; without a pick both views show every
+// language (All cards sends `lang=any`, so the Settings language doesn't apply). A
 // picked price sort (`?sort=`) is added as `order:`/`direction:` unless the query
 // has its own `order:`.
 async function loadCards(fetch: typeof globalThis.fetch, url: URL): Promise<CardsPageData> {
@@ -115,16 +114,3 @@ const queryErrorCodes = new Set([
 	'invalid_value',
 	'collection_only'
 ]);
-
-async function loadDefaultLanguage(fetch: typeof globalThis.fetch): Promise<string> {
-	try {
-		const response = await fetch(`${BACKEND_URL}/api/settings/scryfall_default_language`);
-		if (response.ok) {
-			const data = (await response.json()) as { value?: string };
-			if (data.value) return data.value;
-		}
-	} catch {
-		// Fall through to default
-	}
-	return 'en';
-}

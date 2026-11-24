@@ -11,18 +11,13 @@ import { searchApi, type InventoryCard, type StorageLocation } from '#lib';
 import type { Currency } from '#lib/stores/currency.svelte.ts';
 import { catalogSearch } from './catalog';
 import { errorMessage } from './format';
-import { defaultLanguage, languageParam } from './language';
+import { ANY_LANGUAGE, languageParam } from './language';
 import { live } from './live.svelte';
 import { effectiveStacks, matchesLocation, ownedCount } from './owned';
 import { orderCurrency, sortParam, type PriceSort } from './sort';
 import { idsBetween, type LocationFilter } from './stacks';
 
 export type Source = 'collection' | 'catalog';
-/**
- * The scope dropdown: `catalog` is "All cards" (Scryfall); a LocationFilter is
- * the collection (`all` = every location, `unassigned`, or one location id).
- */
-export type Scope = 'catalog' | LocationFilter;
 
 /** Data the server load hands to the Cards page (see routes/cards/+page.server.ts). */
 export interface CardsPageData {
@@ -52,10 +47,8 @@ export class CardsView {
 	source = $state<Source>('collection');
 	query = $state('');
 	location = $state<LocationFilter>('all');
-	/** The language picked in the dropdown; null shows the scope's default. */
+	/** The language picked in the dropdown; null shows every language. */
 	readonly pickedLanguage: string | null;
-	/** The `scryfall_default_language` setting: what All cards shows without a pick. */
-	readonly settingsLanguage: string;
 	/** The price sort picked in the menu; null keeps the scope's default order. */
 	readonly pickedSort: PriceSort | null;
 	selected = $state<InventoryCard | null>(null);
@@ -74,11 +67,10 @@ export class CardsView {
 	readonly collection: InventoryCard[];
 	readonly locations: StorageLocation[];
 
-	constructor(data: CardsPageData, locations: StorageLocation[], settingsLanguage: string) {
+	constructor(data: CardsPageData, locations: StorageLocation[]) {
 		this.source = data.source;
 		this.query = data.query;
 		this.pickedLanguage = data.language;
-		this.settingsLanguage = settingsLanguage;
 		this.pickedSort = data.sort;
 		this.collection = data.collection;
 		this.catalog = data.catalog.cards;
@@ -95,9 +87,9 @@ export class CardsView {
 		else if (loc && /^\d+$/.test(loc)) this.location = Number(loc);
 	}
 
-	/** The language the results are in: the pick, else the scope's default. */
+	/** The language the results are in: the pick, else every language. */
 	get language(): string {
-		return this.pickedLanguage ?? defaultLanguage(this.source, this.settingsLanguage);
+		return this.pickedLanguage ?? ANY_LANGUAGE;
 	}
 
 	/**
@@ -237,13 +229,16 @@ export class CardsView {
 		return new URLSearchParams(window.location.search);
 	}
 
-	scope = $derived<Scope>(this.source === 'catalog' ? 'catalog' : this.location);
-
-	/** Applies a scope from the dropdown and reruns `query` in it. */
-	setScope(scope: Scope, query: string) {
+	/** Switches between My collection and All cards (clearing any location) and reruns `query`. */
+	setSource(source: Source, query: string) {
 		this.query = query;
-		if (scope === 'catalog') this.navigate('catalog', 'all');
-		else this.navigate('collection', scope);
+		this.navigate(source, 'all');
+	}
+
+	/** Applies a storage location filter in My collection and reruns `query`. */
+	setLocation(location: LocationFilter, query: string) {
+		this.query = query;
+		this.navigate('collection', location);
 	}
 
 	/** Applies a language from the dropdown and reruns `query` in the current scope. */
@@ -260,8 +255,8 @@ export class CardsView {
 
 	/**
 	 * Every search, scope, language and sort change goes through the server load. A
-	 * picked language carries over to another scope unless it is that scope's default;
-	 * a picked sort always does (every scope can sort by price).
+	 * picked language and a picked sort carry over to the other view (both views
+	 * default to Any language, and every view can sort by price).
 	 */
 	navigate(
 		source: Source,
@@ -275,7 +270,7 @@ export class CardsView {
 		else if (location !== undefined) params.set('location', String(location));
 		if (this.query) params.set('q', this.query);
 		else params.delete('q');
-		const lang = languageParam(language, source, this.settingsLanguage);
+		const lang = languageParam(language);
 		if (lang) params.set('lang', lang);
 		else params.delete('lang');
 		const sortValue = sortParam(sort);

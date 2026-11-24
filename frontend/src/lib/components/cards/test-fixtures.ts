@@ -76,8 +76,7 @@ export function cardsView(
 			queryError: null,
 			...data
 		},
-		locations,
-		'en'
+		locations
 	);
 }
 

@@ -10,14 +10,13 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 const bolt = { id: 'bolt-1', oracle_id: 'bolt', name: 'Lightning Bolt' };
 
 /**
- * A backend whose storage and settings endpoints always answer; the card
- * endpoints answer with `collection` and `catalog` (or 404 when not given).
+ * A backend whose storage endpoint always answers; the card endpoints answer
+ * with `collection` and `catalog` (or 404 when not given).
  */
 function backend(routes: { collection?: Route; catalog?: Route } = {}): Mock {
 	return vi.fn(async (input: RequestInfo | URL) => {
 		const url = new URL(String(input));
 		if (url.pathname === '/api/storage') return json({ data: [], total_pages: 1 });
-		if (url.pathname === '/api/settings/scryfall_default_language') return json({ value: 'de' });
 		if (url.pathname === '/api/inventory/search' && routes.collection)
 			return routes.collection(url);
 		if (url.pathname === '/api/search' && routes.catalog) return routes.catalog(url);
@@ -62,7 +61,6 @@ describe('/cards load', () => {
 			expect(data.cards.source).toBe('collection');
 			expect(data.cards.collection).toEqual([bolt]);
 			expect(data.cards.error).toBeNull();
-			expect(data.defaultLanguage).toBe('de');
 		});
 
 		it.each([
@@ -144,25 +142,25 @@ describe('/cards load', () => {
 			expect(data.cards.catalog).toEqual({ cards: [], hasMore: false, total: 0 });
 		});
 
-		it('loads the first page, leaving the language to the backend unless picked', async () => {
+		it('loads the first page in every language unless one is picked', async () => {
 			const fetchMock = backend({ catalog: page });
 
 			const data = await run('?source=catalog&q=bolt', fetchMock);
 
 			const url = requestTo(fetchMock, '/api/search');
 			expect(url.searchParams.get('q')).toBe('bolt');
-			expect(url.searchParams.has('lang')).toBe(false);
+			expect(url.searchParams.get('lang')).toBe('any');
 			expect(data.cards.catalog).toEqual({ cards: [bolt], hasMore: true, total: 120 });
 		});
 
 		it('passes a picked language and price sort', async () => {
 			const fetchMock = backend({ catalog: page });
 
-			await run('?source=catalog&q=bolt&lang=any&sort=eur-asc', fetchMock);
+			await run('?source=catalog&q=bolt&lang=ja&sort=eur-asc', fetchMock);
 
 			const url = requestTo(fetchMock, '/api/search');
 			expect(url.searchParams.get('q')).toBe('bolt order:eur direction:asc');
-			expect(url.searchParams.get('lang')).toBe('any');
+			expect(url.searchParams.get('lang')).toBe('ja');
 		});
 
 		it('treats no match as empty results', async () => {
@@ -197,18 +195,5 @@ describe('/cards load', () => {
 
 			expect(data.cards.queryError).toEqual(expected);
 		});
-	});
-
-	it('falls back to English when the Settings language is unavailable', async () => {
-		const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-			const url = new URL(String(input));
-			if (url.pathname === '/api/storage') return json({ data: [], total_pages: 1 });
-			if (url.pathname === '/api/inventory/search') return json({ data: [], total_cards: 0 });
-			return new Response('boom', { status: 500 });
-		});
-
-		const data = await run('', fetchMock);
-
-		expect(data.defaultLanguage).toBe('en');
 	});
 });

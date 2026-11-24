@@ -19,16 +19,48 @@ vi.mock('$app/state', () => ({ page: { url: new URL('http://localhost/cards') },
 afterEach(() => vi.restoreAllMocks());
 
 describe('CardsHeader', () => {
-	it('reruns the typed search in the scope picked', async () => {
+	it('reruns the typed search in the storage location picked', async () => {
 		const view = cardsView();
-		const setScope = vi.spyOn(view, 'setScope').mockImplementation(() => {});
+		const setLocation = vi.spyOn(view, 'setLocation').mockImplementation(() => {});
 		await render(CardsHeader, { view });
 
-		await page.getByRole('searchbox', { name: 'Search your cards' }).fill('t:dragon');
-		await page.getByLabelText('Where to search: My collection').click();
+		await page.getByRole('searchbox', { name: 'Search your collection' }).fill('t:dragon');
+		await page.getByLabelText('Storage location: All locations').click();
 		await page.getByRole('button', { name: 'Box B' }).click();
 
-		expect(setScope).toHaveBeenCalledWith(2, 't:dragon');
+		expect(setLocation).toHaveBeenCalledWith(2, 't:dragon');
+	});
+
+	it('switches between My collection and All cards while keeping the typed search', async () => {
+		const view = cardsView();
+		const setSource = vi.spyOn(view, 'setSource').mockImplementation(() => {});
+		await render(CardsHeader, { view });
+
+		await page.getByRole('searchbox', { name: 'Search your collection' }).fill('sol ring');
+		await page.getByRole('tab', { name: 'My collection' }).click();
+		expect(setSource).not.toHaveBeenCalled();
+
+		await page.getByRole('tab', { name: 'All cards' }).click();
+		expect(setSource).toHaveBeenCalledWith('catalog', 'sol ring');
+	});
+
+	it('hides the location menu and updates the search box in All cards', async () => {
+		const { rerender } = await render(CardsHeader, { view: cardsView() });
+		await expect.element(page.getByLabelText('Storage location: All locations')).toBeVisible();
+		await expect
+			.element(page.getByRole('tab', { name: 'My collection' }))
+			.toHaveAttribute('aria-selected', 'true');
+
+		await rerender({ view: cardsView({ source: 'catalog' }) });
+		await expect
+			.element(page.getByLabelText('Storage location: All locations'))
+			.not.toBeInTheDocument();
+		await expect
+			.element(page.getByRole('tab', { name: 'All cards' }))
+			.toHaveAttribute('aria-selected', 'true');
+		await expect
+			.element(page.getByRole('searchbox', { name: 'Search all cards on Scryfall' }))
+			.toBeVisible();
 	});
 
 	it('disables the language menu while the search names a language', async () => {

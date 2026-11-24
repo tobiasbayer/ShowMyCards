@@ -14,13 +14,9 @@
 	import { ui } from './live.svelte';
 	import { CardsView, type CardsPageData } from './view.svelte';
 
-	let {
-		data,
-		locations,
-		settingsLanguage
-	}: { data: CardsPageData; locations: StorageLocation[]; settingsLanguage: string } = $props();
+	let { data, locations }: { data: CardsPageData; locations: StorageLocation[] } = $props();
 
-	const view = untrack(() => new CardsView(data, locations, settingsLanguage));
+	const view = untrack(() => new CardsView(data, locations));
 
 	// Esc closes an open popover, menu or dialog first (they count themselves in
 	// ui.openPopovers), then clears the selection, then closes the panel.

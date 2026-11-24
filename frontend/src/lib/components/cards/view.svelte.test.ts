@@ -1,3 +1,4 @@
+import { goto } from '$app/navigation';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { live } from './live.svelte';
 import { card, cardsView, fakeBackend, json, type FakeBackend } from './test-fixtures';
@@ -76,5 +77,75 @@ describe('CardsView', () => {
 		expect(url.searchParams.get('q')).toBe('bolt order:usd direction:desc');
 		expect(url.searchParams.get('lang')).toBe('ja');
 		expect(url.searchParams.get('page')).toBe('2');
+	});
+
+	it('asks for the next page in every language without a pick', async () => {
+		backend.spy.mockImplementationOnce(async () =>
+			json({ data: [], page: 2, total_cards: 200, has_more: false })
+		);
+		const v = view();
+
+		await v.loadMore();
+
+		const url = new URL(backend.requests()[0].slice('GET '.length), 'http://localhost');
+		expect(v.language).toBe('any');
+		expect(url.searchParams.get('lang')).toBe('any');
+	});
+
+	it('carries a picked language over to the other view', () => {
+		const path = window.location.pathname;
+		const original = `${path}${window.location.search}`;
+		history.replaceState(null, '', `${path}?source=collection&q=old&lang=ja`);
+		try {
+			cardsView({ language: 'ja' }).setSource('catalog', 'bolt');
+			expect(goto).toHaveBeenLastCalledWith('/cards?source=catalog&q=bolt&lang=ja', {
+				reset: false
+			});
+
+			cardsView({ source: 'catalog', query: 'bolt', language: 'ja' }).setSource(
+				'collection',
+				'bolt'
+			);
+			expect(goto).toHaveBeenLastCalledWith('/cards?source=collection&q=bolt&lang=ja', {
+				reset: false
+			});
+		} finally {
+			history.replaceState(null, '', original);
+		}
+	});
+
+	it('clears any storage location when switching source and keeps the query', () => {
+		const path = window.location.pathname;
+		const original = `${path}${window.location.search}`;
+		history.replaceState(null, '', `${path}?source=collection&location=2&q=old`);
+		try {
+			const v = cardsView();
+			v.setSource('catalog', 't:dragon');
+
+			expect(goto).toHaveBeenLastCalledWith('/cards?source=catalog&q=t%3Adragon', { reset: false });
+		} finally {
+			history.replaceState(null, '', original);
+		}
+	});
+
+	it('sets and clears the storage location within My collection', () => {
+		const path = window.location.pathname;
+		const original = `${path}${window.location.search}`;
+		history.replaceState(null, '', `${path}?source=collection`);
+		try {
+			const v = cardsView();
+			v.setLocation(2, 't:dragon');
+			expect(goto).toHaveBeenLastCalledWith('/cards?source=collection&location=2&q=t%3Adragon', {
+				reset: false
+			});
+
+			history.replaceState(null, '', `${path}?source=collection&location=2`);
+			v.setLocation('all', 't:dragon');
+			expect(goto).toHaveBeenLastCalledWith('/cards?source=collection&q=t%3Adragon', {
+				reset: false
+			});
+		} finally {
+			history.replaceState(null, '', original);
+		}
 	});
 });

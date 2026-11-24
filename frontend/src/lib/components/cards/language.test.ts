@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultLanguage, languageName, languageParam, parseLanguage } from './language';
+import { languageName, languageParam, parseLanguage } from './language';
 
 describe('parseLanguage', () => {
 	it('accepts offered codes and any', () => {
@@ -15,36 +15,18 @@ describe('parseLanguage', () => {
 	});
 });
 
-describe('defaultLanguage', () => {
-	it('shows every language in the collection', () => {
-		expect(defaultLanguage('collection', 'de')).toBe('any');
-	});
-
-	it('uses the Settings language for All cards', () => {
-		expect(defaultLanguage('catalog', 'de')).toBe('de');
-	});
-});
-
 describe('languageParam', () => {
-	it('keeps a pick that differs from the scope default', () => {
-		expect(languageParam('ja', 'collection', 'de')).toBe('ja');
-		expect(languageParam('ja', 'catalog', 'de')).toBe('ja');
-		expect(languageParam('any', 'catalog', 'de')).toBe('any');
+	it('keeps a picked language', () => {
+		expect(languageParam('ja')).toBe('ja');
+		expect(languageParam('de')).toBe('de');
 	});
 
-	it('drops a pick equal to the scope default', () => {
-		expect(languageParam('any', 'collection', 'de')).toBeNull();
-		expect(languageParam('de', 'catalog', 'de')).toBeNull();
-	});
-
-	it('carries a pick across scopes until it matches the default there', () => {
-		// German picked in the collection: kept there, dropped in All cards (Settings = German).
-		expect(languageParam('de', 'collection', 'de')).toBe('de');
-		expect(languageParam('de', 'catalog', 'de')).toBeNull();
+	it('drops Any, the default in every view', () => {
+		expect(languageParam('any')).toBeNull();
 	});
 
 	it('has nothing to keep without a pick', () => {
-		expect(languageParam(null, 'catalog', 'de')).toBeNull();
+		expect(languageParam(null)).toBeNull();
 	});
 });
 

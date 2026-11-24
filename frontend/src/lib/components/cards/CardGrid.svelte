@@ -36,11 +36,11 @@
 			{/each}
 		</p>
 		{#if view.queryError.code === 'unsupported'}
-			<button class="btn btn-link btn-sm" onclick={() => view.setScope('catalog', view.query)}>
+			<button class="btn btn-link btn-sm" onclick={() => view.setSource('catalog', view.query)}>
 				Search All cards instead
 			</button>
 		{:else if view.queryError.code === 'collection_only'}
-			<button class="btn btn-link btn-sm" onclick={() => view.setScope('all', view.query)}>
+			<button class="btn btn-link btn-sm" onclick={() => view.setSource('collection', view.query)}>
 				Search My collection instead
 			</button>
 		{/if}
@@ -49,7 +49,7 @@
 	<p class="py-16 text-center text-sm text-error">{view.error}</p>
 {:else if view.source === 'catalog' && !view.query.trim()}
 	<div class="py-24 text-center">
-		<p class="text-lg font-medium">Search all cards</p>
+		<p class="text-lg font-medium">Search all cards on Scryfall</p>
 		<p class="mt-1 text-sm text-base-content/60">
 			Scryfall syntax works, e.g. <code>t:dragon c:r</code>
 		</p>

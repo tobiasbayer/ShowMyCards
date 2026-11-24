@@ -283,7 +283,7 @@ Frontend, under `frontend/src/` (`cards/` is `lib/components/cards/`):
 | `cards/owned.ts` | What a card's copies show: `effectiveStacks`, `ownedCount`, `scopeRows`, `existingLocation`, `locationName` |
 | `cards/writes.ts` (+ `writes.svelte.test.ts`) | The per-card write queue, single-card actions (`addCopy`, `removeCopy`, `undoAdd`, `moveStack`), bulk actions (`moveCopies`, `deleteCopies`, `resortCopies`), `resolveAuto` |
 | `cards/stacks.ts`, `catalog.ts`, `language.ts`, `sort.ts`, `format.ts`, `printings.ts` (+ tests) | Pure helpers: stack rows, the All cards search params, language and sort rules, wording, the panel's printings cache |
-| `cards/CardsHeader.svelte`, `ScopeMenu`, `LanguageMenu`, `SortMenu`, `SearchBuilder` | The header: search field with the builder popover, scope, language and sort menus, counter |
+| `cards/CardsHeader.svelte`, `LocationMenu`, `LanguageMenu`, `SortMenu`, `SearchBuilder` | The header: source switch and counter, search field with the builder popover, location (collection only), language and sort menus |
 | `cards/CardGrid.svelte`, `CardTile`, `CardPanel`, `AddPopover`, `MoveMenu`, `SelectionBar` (+ specs) | Grid, tile, detail panel, Add popover, Move menu, selection bar |
 | `cards/test-fixtures.ts` | Cards, rows, locations, a view and a fake backend for the tests |
 | `lib/components/Dropdown.svelte` (+ spec) | The shared DaisyUI `<details>` dropdown (no OS menus): Esc and outside clicks close only the menu |
@@ -886,3 +886,19 @@ The user asked to promote the Cards page to production on this branch: delete th
 - svelte-check: 0 errors and 0 warnings. eslint and prettier are clean.
 - The client project passes 101/101 three runs in a row.
 - Full `bun run test` runs (503 tests) lose 2–3 browser tests to Vitest harness errors ("Cannot find vitest-iframe", "Frame was detached"). They hit different files on each run, and the branch without this change fails the same way (490/493, twice).
+
+# Follow-up: source switcher vs. location picker (2026-11-24)
+
+The single `In:` scope dropdown (`All cards`, `My collection`, locations, `Unassigned`) made it too subtle whether a search was running locally over the collection or live on Scryfall. A grilling session split the two levels apart again:
+
+**Settled (grilling):**
+- **Two-row header:** a boxed segmented switcher (`tabs tabs-box tabs-sm`) top-left with **My collection** (left, default, `Library` icon) and **All cards** (right, `Globe` icon), with the result counter right-aligned on the same row. Row 2 holds the search input, the location dropdown (collection only), the language dropdown and the sort menu.
+- **Dedicated location picker (`LocationMenu.svelte`, replacing `ScopeMenu.svelte`):** hidden in All cards; in My collection it keeps the `In` prefix with `All locations` as the default, followed by a divider, each storage location and `Unassigned`.
+- **Switching semantics:** switching My collection ↔ All cards keeps the typed query and reruns it immediately; switching to All cards clears `?location` so URLs stay clean and returning to My collection lands in `All locations` (browser Back still returns to the previous location). Clicking the active tab is a no-op.
+- **Copy & styling:** neutral styling overall; placeholders sharpened to `"Search your collection (Scryfall syntax)"` and `"Search all cards on Scryfall"`, with the All cards empty-state heading aligned to `"Search all cards on Scryfall"`. URL params (`source`, `location`, `q`, `lang`, `sort`) are unchanged.
+- **View API:** `CardsView.setScope` is replaced by `setSource(source, query)` and `setLocation(location, query)`.
+
+**Language default (same day, user request):** both views now default to **Any language**, and a picked language carries over between My collection and All cards in both directions. This replaces the 2026-11-13 rule that All cards defaulted to the Settings language.
+- `?lang=` is left out for Any, the default in every view; any other pick stays in the URL across view switches.
+- All cards always sends `lang` to `/api/search` (`any` without a pick), so the backend's `scryfall_default_language` no longer applies on the Cards page. The setting still drives `/api/search` calls without `lang` (the deck page's add-card search) and the deck add lookup in `api/decks.go`.
+- The Cards page no longer loads the setting: `loadDefaultLanguage`, `defaultLanguage(source, settingsLanguage)` and the `settingsLanguage` plumbing through `CardsPage`/`CardsView` are gone; `languageParam(picked)` drops only `any`.

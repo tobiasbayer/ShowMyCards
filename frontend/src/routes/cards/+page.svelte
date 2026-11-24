@@ -11,8 +11,5 @@
 
 <!-- Every search, scope, language and sort change is a new server load: start a fresh view. -->
 {#key data.cards}
-	<CardsPage
-		data={data.cards}
-		locations={data.storageLocations}
-		settingsLanguage={data.defaultLanguage} />
+	<CardsPage data={data.cards} locations={data.storageLocations} />
 {/key}
