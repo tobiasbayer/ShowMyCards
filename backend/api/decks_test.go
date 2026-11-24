@@ -1371,16 +1371,6 @@ func createDeckTestPrinting(t *testing.T, db *gorm.DB, scryfallID, oracleID, nam
 	}
 }
 
-func seedPinnedDeckItem(t *testing.T, db *gorm.DB, deckID uint, oracleID, scryfallID string, qty int) {
-	t.Helper()
-	item := models.DeckItem{
-		DeckID: deckID, OracleID: oracleID, ScryfallID: scryfallID, Zone: models.ZoneMain, DesiredQuantity: qty,
-	}
-	if err := db.Create(&item).Error; err != nil {
-		t.Fatalf("failed to create pinned deck item for %s: %v", scryfallID, err)
-	}
-}
-
 // The Swamp case: two decks pin the German printing more often than it is owned,
 // although the card's total fits. A third deck that wants any printing is still
 // flagged, and shared_cards tells it which printing and which decks are behind it.
@@ -1394,8 +1384,8 @@ func TestDeckListItems_SharedCardsExplainPinnedConflict(t *testing.T) {
 	createDeckTestPrinting(t, db, "scry-en", "oracle-swamp", "Swamp", "ecl", "271", "en")
 	addDeckInventory(t, db, "oracle-swamp", "scry-de", 4)
 	addDeckInventory(t, db, "oracle-swamp", "scry-en", 5)
-	seedPinnedDeckItem(t, db, x.ID, "oracle-swamp", "scry-de", 3)
-	seedPinnedDeckItem(t, db, y.ID, "oracle-swamp", "scry-de", 2)
+	seedPinnedDeckItem(t, db, x.ID, "oracle-swamp", "scry-de", models.ZoneMain, 3)
+	seedPinnedDeckItem(t, db, y.ID, "oracle-swamp", "scry-de", models.ZoneMain, 2)
 	seedDeckItem(t, db, z.ID, "oracle-swamp", models.ZoneMain, 1)
 
 	assertDeckTotals(t, app, z, 0, 1)
@@ -1597,9 +1587,9 @@ func TestDeckListItems_LocalizedCardNames(t *testing.T) {
 	// English printing (no printed_name).
 	createLocalizedDeckTestCard(t, db, "sol-en", "oracle-sol", "Sol Ring", "", "cmm", "703", "en", "Artifact", legal)
 
-	seedPinnedDeckItem(t, db, deck.ID, "oracle-bolt", "bolt-de", 4)
+	seedPinnedDeckItem(t, db, deck.ID, "oracle-bolt", "bolt-de", models.ZoneMain, 4)
 	seedDeckItem(t, db, deck.ID, "oracle-swamp", models.ZoneMain, 4)
-	seedPinnedDeckItem(t, db, deck.ID, "oracle-sol", "sol-en", 1)
+	seedPinnedDeckItem(t, db, deck.ID, "oracle-sol", "sol-en", models.ZoneMain, 1)
 
 	got := fetchDeckItems(t, app, deck.ID)
 	if len(got.Main) != 3 {
@@ -1640,10 +1630,10 @@ func TestDeckListItems_SharedCardsLocalizedNames(t *testing.T) {
 	addDeckInventory(t, db, "oracle-bolt", "bolt-de", 4)
 	addDeckInventory(t, db, "oracle-forest", "forest-en", 4)
 
-	seedPinnedDeckItem(t, db, d1.ID, "oracle-forest", "forest-en", 3)
-	seedPinnedDeckItem(t, db, d1.ID, "oracle-bolt", "bolt-de", 3)
-	seedPinnedDeckItem(t, db, d2.ID, "oracle-forest", "forest-en", 3)
-	seedPinnedDeckItem(t, db, d2.ID, "oracle-bolt", "bolt-de", 3)
+	seedPinnedDeckItem(t, db, d1.ID, "oracle-forest", "forest-en", models.ZoneMain, 3)
+	seedPinnedDeckItem(t, db, d1.ID, "oracle-bolt", "bolt-de", models.ZoneMain, 3)
+	seedPinnedDeckItem(t, db, d2.ID, "oracle-forest", "forest-en", models.ZoneMain, 3)
+	seedPinnedDeckItem(t, db, d2.ID, "oracle-bolt", "bolt-de", models.ZoneMain, 3)
 
 	shared := fetchDeckItems(t, app, d1.ID).SharedCards
 	if len(shared) != 2 {
@@ -1675,7 +1665,7 @@ func TestDeckLegality_LocalizedCardNames(t *testing.T) {
 	addDeckInventory(t, db, "oracle-bolt", "bolt-de", 5)
 
 	seedDeckItem(t, db, deck.ID, "oracle-island", models.ZoneMain, 54)
-	seedPinnedDeckItem(t, db, deck.ID, "oracle-lotus", "lotus-de", 1)
+	seedPinnedDeckItem(t, db, deck.ID, "oracle-lotus", "lotus-de", models.ZoneMain, 1)
 	seedDeckItem(t, db, deck.ID, "oracle-bolt", models.ZoneMain, 5)
 
 	got := fetchDeckLegality(t, app, deck.ID)

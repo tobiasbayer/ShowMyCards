@@ -1,20 +1,20 @@
 <script lang="ts">
-	import type { EnhancedCardResult } from '#lib';
-	import { getDisplayName, notifications, getActionError } from '#lib';
+	import type { DeckZone, EnhancedCardResult } from '#lib';
+	import {
+		getDisplayName,
+		notifications,
+		getActionError,
+		PICKABLE_ZONES,
+		ZONE_LABELS,
+		zonesLabel
+	} from '#lib';
 	import { refreshAll } from '$app/navigation';
 	import { deserialize } from '$app/forms';
 	import { Info, Plus } from '@lucide/svelte';
 
 	let { card }: { card: EnhancedCardResult } = $props();
 
-	const ZONES = [
-		{ value: 'command', label: 'Command' },
-		{ value: 'main', label: 'Main' },
-		{ value: 'side', label: 'Side' },
-		{ value: 'maybe', label: 'Maybe' }
-	];
-
-	let zone = $state('main');
+	let zone = $state<DeckZone>('main');
 	let qty = $state(1);
 	let pin = $state(false);
 
@@ -47,7 +47,10 @@
 			const result = deserialize(await response.text());
 			if (result.type === 'success') {
 				await refreshAll();
-				const zoneLabel = ZONES.find((z) => z.value === zone)?.label ?? zone;
+				// Tokens and other extras are stored in Other whatever zone was picked,
+				// so name the zone the server reports.
+				const stored = result.data?.zones;
+				const zoneLabel = zonesLabel(Array.isArray(stored) && stored.length > 0 ? stored : [zone]);
 				notifications.success(`Added ${displayName} to ${zoneLabel}`);
 			} else if (result.type === 'failure') {
 				notifications.error(getActionError(result.data, 'Failed to add card'));
@@ -87,8 +90,8 @@
 		<label class="flex flex-col gap-1 text-xs">
 			<span class="opacity-70">Zone</span>
 			<select bind:value={zone} class="select select-bordered select-sm" aria-label="Zone">
-				{#each ZONES as z (z.value)}
-					<option value={z.value}>{z.label}</option>
+				{#each PICKABLE_ZONES as z (z)}
+					<option value={z}>{ZONE_LABELS[z]}</option>
 				{/each}
 			</select>
 		</label>
