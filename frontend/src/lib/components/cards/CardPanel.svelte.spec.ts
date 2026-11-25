@@ -4,7 +4,7 @@ import { render } from 'vitest-browser-svelte';
 import type { DeckCardUsage } from '#lib';
 import CardPanel from './CardPanel.svelte';
 import { live } from './live.svelte';
-import { card, cardsView, fakeBackend, row, type FakeBackend } from './test-fixtures';
+import { card, cardsView, fakeBackend, location, row, type FakeBackend } from './test-fixtures';
 
 vi.mock('$app/navigation', () => ({
 	goto: vi.fn(),
@@ -95,5 +95,23 @@ describe('CardPanel', () => {
 		await expect.element(page.getByRole('heading', { name: 'Blitzschlag' })).toBeInTheDocument();
 		await expect.element(page.getByText(/3 Schadenspunkte/)).toBeInTheDocument();
 		await expect.element(page.getByText(/deals 3 damage/)).not.toBeInTheDocument();
+	});
+
+	it('orders stacks by manual storage location sort_order with Unassigned last', async () => {
+		const locZ = location(1, 'Zebra Box', 1);
+		const locA = location(2, 'Alpha Box', 3);
+		const locM = location(3, 'Middle Binder', 2);
+		const bolt = card([row(1, 1, null), row(2, 1, 2), row(3, 1, 3), row(4, 1, 1)]);
+		await render(CardPanel, {
+			card: bolt,
+			view: cardsView({ collection: [bolt] }, [locZ, locM, locA])
+		});
+
+		await expect.element(page.getByText('Zebra Box').first()).toBeInTheDocument();
+		const section = page.getByRole('heading', { name: 'Your copies' }).element().closest('section');
+		const labels = Array.from(
+			section?.querySelectorAll('ul.divide-y > li > span:nth-child(2)') ?? []
+		).map((el) => el.textContent?.trim());
+		expect(labels).toEqual(['Zebra Box', 'Middle Binder', 'Alpha Box', 'Unassigned']);
 	});
 });

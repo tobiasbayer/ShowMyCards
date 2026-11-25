@@ -52,8 +52,8 @@ export function card(
 	};
 }
 
-export function location(id: number, name: string): StorageLocation {
-	return { id, name, storage_type: 'Box', created_at: '', updated_at: '' };
+export function location(id: number, name: string, sortOrder = id): StorageLocation {
+	return { id, name, storage_type: 'Box', sort_order: sortOrder, created_at: '', updated_at: '' };
 }
 
 export const boxA = location(1, 'Box A');

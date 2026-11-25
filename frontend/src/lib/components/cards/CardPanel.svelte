@@ -13,7 +13,13 @@
 	import AddPopover from './AddPopover.svelte';
 	import MoveMenu from './MoveMenu.svelte';
 	import { countOpen, live } from './live.svelte';
-	import { effectiveStacks, finishLabel, locationName, ownedCount } from './owned';
+	import {
+		compareLocationOrder,
+		effectiveStacks,
+		finishLabel,
+		locationName,
+		ownedCount
+	} from './owned';
 	import type { Stack } from './stacks';
 	import type { CardsView } from './view.svelte';
 	import { addCopy, moveStack, refreshCard, removeCopy } from './writes';
@@ -87,9 +93,7 @@
 		effectiveStacks(card).sort(
 			(a, b) =>
 				a.finish.localeCompare(b.finish) ||
-				locationName(view.locations, a.locationId).localeCompare(
-					locationName(view.locations, b.locationId)
-				)
+				compareLocationOrder(view.locations, a.locationId, b.locationId)
 		)
 	);
 

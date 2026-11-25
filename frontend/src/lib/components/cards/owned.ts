@@ -77,6 +77,21 @@ export function locationName(locations: StorageLocation[], id: number | null): s
 	return locations.find((l) => l.id === id)?.name ?? `Location ${id}`;
 }
 
+/** Sort location IDs by manual `sort_order` (ID tie-breaker), keeping `null` (Unassigned) last. */
+export function compareLocationOrder(
+	locations: StorageLocation[],
+	a: number | null,
+	b: number | null
+): number {
+	if (a === null && b === null) return 0;
+	if (a === null) return 1;
+	if (b === null) return -1;
+	const orderA = locations.find((l) => l.id === a)?.sort_order ?? Number.MAX_SAFE_INTEGER;
+	const orderB = locations.find((l) => l.id === b)?.sort_order ?? Number.MAX_SAFE_INTEGER;
+	if (orderA !== orderB) return orderA - orderB;
+	return a - b;
+}
+
 export function finishLabel(finish: string): string {
 	return finish.charAt(0).toUpperCase() + finish.slice(1);
 }
