@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import type { SearchResponse } from '#lib';
+import type { InventoryCard, SearchResponse } from '#lib';
 
 /**
  * Query parameters for card search
@@ -37,5 +37,18 @@ export const searchApi = {
 		if (params.lang) searchParams.set('lang', params.lang);
 
 		return apiClient.get<SearchResponse>(`/search?${searchParams.toString()}`);
+	},
+
+	/**
+	 * Fetch all printings of a card by oracle ID, combining owned printings
+	 * across all languages with language-filtered Scryfall printings.
+	 */
+	printings: (oracleId: string, lang?: string) => {
+		const searchParams = new URLSearchParams();
+		if (lang) searchParams.set('lang', lang);
+		const query = searchParams.toString();
+		return apiClient.get<InventoryCard[]>(
+			`/cards/printings/${encodeURIComponent(oracleId)}${query ? `?${query}` : ''}`
+		);
 	}
 };

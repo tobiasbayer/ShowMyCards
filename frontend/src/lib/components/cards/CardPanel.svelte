@@ -23,6 +23,7 @@
 	import type { Stack } from './stacks';
 	import type { CardsView } from './view.svelte';
 	import { addCopy, moveStack, refreshCard, removeCopy } from './writes';
+	import { languageName } from './language';
 	import { loadPrintings } from './printings';
 	import { parseOracleText } from '#lib/utils/oracle-text.ts';
 
@@ -286,15 +287,18 @@
 			<div class="-mx-1 flex gap-2 overflow-x-auto px-1 pt-1.5 pb-2">
 				{#each printings as p (p.id)}
 					{@const n = ownedCount(p)}
+					{@const diffLang = Boolean(p.language && p.language !== card.language)}
 					<button
 						type="button"
 						class="relative w-14 shrink-0 transition hover:-translate-y-0.5"
-						title="{p.set_name} · #{p.collector_number}"
+						title="{p.set_name} · #{p.collector_number}{diffLang
+							? ` · ${languageName(p.language)}`
+							: ''}"
 						onclick={() => view.select(p)}>
 						{#if p.image_uri}
 							<img
 								src={p.image_uri}
-								alt={p.set_name}
+								alt={diffLang ? `${p.set_name} (${languageName(p.language)})` : p.set_name}
 								loading="lazy"
 								class="aspect-[488/680] w-full rounded-[4.75%/3.4%] object-cover shadow-sm" />
 						{/if}
@@ -302,6 +306,11 @@
 							<span
 								class="badge badge-primary badge-xs absolute -right-1.5 -top-1.5 rounded-full px-1 font-semibold tabular-nums"
 								>{n}</span>
+						{/if}
+						{#if diffLang}
+							<span
+								class="badge badge-neutral badge-xs absolute bottom-1 left-1 rounded px-1 font-semibold uppercase"
+								>{p.language}</span>
 						{/if}
 					</button>
 				{/each}

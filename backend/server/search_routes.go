@@ -15,5 +15,6 @@ func SearchRoutes(app *fiber.App, client *scryfall.Client, db *gorm.DB, settings
 
 	app.Get("/api/search", handler.Search)
 	app.Post("/api/cards/resolve", handler.Resolve)
+	app.Get("/api/cards/printings/:oracle_id", handler.Printings)
 	app.Get("/api/cards/:id", handler.GetCard)
 }

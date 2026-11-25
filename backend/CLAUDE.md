@@ -300,6 +300,7 @@ renamed on startup by `renameSettingKeys` in `database/client.go`.
   - Collection keywords (`finish:`, `qty`, `free`) return 400 `code: collection_only`
   - Returns enhanced results with inventory info (this printing, other printings) and deck
     availability (`deck`: owned, decked, free, and free copies per owned printing)
+- `GET /api/cards/printings/:oracle_id` - Get all printings of a card (owned printings across all languages first, plus language-filtered Scryfall printings)
 - `GET /api/cards/:id` - Get single card by Scryfall ID
 
 ## Domain Model

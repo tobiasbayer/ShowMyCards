@@ -4,6 +4,7 @@ import { render } from 'vitest-browser-svelte';
 import type { DeckCardUsage } from '#lib';
 import CardPanel from './CardPanel.svelte';
 import { live } from './live.svelte';
+import { invalidatePrintings } from './printings';
 import { card, cardsView, fakeBackend, location, row, type FakeBackend } from './test-fixtures';
 
 vi.mock('$app/navigation', () => ({
@@ -31,6 +32,7 @@ let backend: FakeBackend;
 
 beforeEach(() => {
 	live.reset();
+	invalidatePrintings();
 	backend = fakeBackend();
 });
 
@@ -39,7 +41,7 @@ afterEach(() => vi.restoreAllMocks());
 describe('CardPanel', () => {
 	it('lists your copies, the decks and the other printings', async () => {
 		backend.decks = [inBurn];
-		backend.search = [
+		backend.printings = [
 			card(),
 			card([], {}, { id: 'bolt-2', set_name: 'Alpha', collector_number: '161' })
 		];
@@ -62,9 +64,35 @@ describe('CardPanel', () => {
 		// No deck wants it: "In decks" is just the link to add it to one.
 		await expect.element(page.getByRole('button', { name: 'Add to deck' })).toBeInTheDocument();
 		await vi.waitFor(() =>
-			expect(backend.requests().some((r) => r.startsWith('GET /api/search'))).toBe(true)
+			expect(backend.requests().some((r) => r.startsWith('GET /api/cards/printings/'))).toBe(true)
 		);
 		await expect.element(page.getByText('Other printings')).not.toBeInTheDocument();
+	});
+
+	it('shows owned printings in other languages with a language badge and selects them on click', async () => {
+		const english = card();
+		const japanese = card(
+			[row(2, 2, 1, 'nonfoil', 'brimaz-ja')],
+			{},
+			{
+				id: 'brimaz-ja',
+				set_name: 'Born of the Gods',
+				collector_number: '5',
+				language: 'ja',
+				printed_name: 'オレスコスの王、ブリマーズ'
+			}
+		);
+		backend.printings = [japanese];
+		const view = cardsView({ collection: [english] });
+		await render(CardPanel, { card: english, view });
+
+		const button = page.getByTitle('Born of the Gods · #5 · Japanese');
+		await expect.element(button).toBeInTheDocument();
+		await expect.element(button.getByText('2')).toBeInTheDocument();
+		await expect.element(button.getByText('ja')).toBeInTheDocument();
+
+		await button.click();
+		expect(view.selected?.id).toBe('brimaz-ja');
 	});
 
 	it('tells a failed load from an empty one, and retries', async () => {

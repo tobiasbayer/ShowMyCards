@@ -94,6 +94,8 @@ export interface FakeBackend {
 	decks: DeckCardUsage[];
 	/** GET /api/search results (one page, no more). */
 	search: InventoryCard[];
+	/** GET /api/cards/printings/:oracle_id results. */
+	printings: InventoryCard[];
 	/** Requests that fail with a 500, by "METHOD /path" prefix. */
 	failing: string[];
 	spy: MockInstance<typeof fetch>;
@@ -111,6 +113,7 @@ export function fakeBackend(): FakeBackend {
 		availability: { owned: 0, decked: 0, free: 0 },
 		decks: [],
 		search: [],
+		printings: [],
 		failing: [],
 		spy: vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
 			const request = describe(input, init);
@@ -130,6 +133,7 @@ export function fakeBackend(): FakeBackend {
 				}
 				if (url.startsWith('/api/inventory/availability/')) return json(backend.availability);
 				if (url.startsWith('/api/decks/for-card/')) return json(backend.decks);
+				if (url.startsWith('/api/cards/printings/')) return json(backend.printings);
 				if (url.startsWith('/api/search?')) {
 					return json({
 						data: backend.search,

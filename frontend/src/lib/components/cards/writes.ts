@@ -13,6 +13,7 @@ import {
 import { errorMessage, plural } from './format';
 import { live } from './live.svelte';
 import { currentRows, locationName, scopeRows } from './owned';
+import { invalidatePrintings } from './printings';
 import { pickRowToDecrement, rowsOfStack, type LocationFilter, type Stack } from './stacks';
 
 /** Where an added copy goes: a location id, unassigned, or wherever the sorting rules say. */
@@ -30,6 +31,7 @@ async function refresh(card: InventoryCard) {
 	live.rows[card.id] = rows.data ?? [];
 	live.availability[card.oracle_id] = availability;
 	if (live.rows[card.id].some((r) => r.quantity > 0)) live.owned[card.id] = card;
+	invalidatePrintings(card.oracle_id);
 }
 
 const queues = new Map<string, Promise<unknown>>();

@@ -345,7 +345,7 @@ These override the proposal where they differ.
    - Multi-face cards show each face in order, separated by a thin rule. The rule is quite faint in the dark theme.
 3. **Your copies:** one row per finish × location, with −/+ and Move (Move moves the whole stack).
 4. **In decks:** deck name and quantity. When empty, the section is just a quiet "Add to deck" link.
-5. **Other printings:** a thumbnail strip with the owned badge, loaded when the panel opens and cached per oracle. Clicking a thumbnail shows that printing.
+5. **Other printings:** a thumbnail strip with the owned badge, loaded when the panel opens and cached per oracle (invalidated on inventory writes). Owned printings in any language come first, and printings in a different language show a language badge. Clicking a thumbnail shows that printing.
 
 ### Card language
 - The user wants panel text in the card's language: name and card text in German for German printings.
@@ -603,7 +603,7 @@ The user wanted the old search page's language dropdown on the Cards page, defau
   - **Applies at once:** picking a language reruns the typed query, like a scope change.
   - **A typed clause wins:** `l:`, `lang:` or `language:` in the search dims and disables the dropdown; its tooltip names the clause. No hint line.
   - **Control:** a DaisyUI `<details class="dropdown">` (no OS menu), styled like the scope picker when closed, placed right after it.
-  - **Panel "Other printings"** shows printings in the opened card's language, in every scope (`l:<card.language>`), instead of the Settings language.
+  - **Panel "Other printings"** shows printings in the opened card's language plus owned printings in every language (via `GET /api/cards/printings/:oracle_id`), instead of the Settings language.
   - **Unchanged:** the old page (`?variant=current`) and the Settings page.
 - **How it runs:**
   - Collection: `+page.server.ts` adds `l:<code>` to the query sent to `/api/inventory/search` unless the query has a clause or the pick is Any.
@@ -742,7 +742,7 @@ Other Scryfall errors in All cards show "Scryfall couldn't read this search" (or
 ## Facts found (code and data)
 
 ### API and code
-- **Ignored `unique=` parameter:** `/api/search` ignores a `unique=` query parameter and reads the unique mode from settings (`backend/api/search.go`). The `unique:prints` keyword inside `q` works, and both `oracleid:` and `oracle_id:` are valid Scryfall syntax. This is why "Other printings" on today's `/cards/[id]` page is incomplete: it sends `&unique=prints`.
+- **Ignored `unique=` parameter:** `/api/search` ignores a `unique=` query parameter and reads the unique mode from settings (`backend/api/search.go`). The `unique:prints` keyword inside `q` works, and both `oracleid:` and `oracle_id:` are valid Scryfall syntax. Both `/cards/[id]` and the Cards panel now use `GET /api/cards/printings/:oracle_id`, which sets `UniqueModePrints` directly and merges owned printings from local data across all languages.
 - **Deck availability exists only on inventory results.** `InventoryCard.deck {owned, decked, free}` is per card (oracle), finish-blind, and computed by `services/allocation.go`. Since 2026-11-13 it also carries `printings` (free copies per owned printing). Only `/api/inventory/cards` serves it; search results do not, so the prototype builds an oracle → availability map from the full collection. *(Changed 2026-11-13: `/api/search` results carry it, `printings` included, and `/api/inventory/cards` is removed.)*
 - **A mistyped helper causes the existing type errors.** `fetchAllInventoryCards` (`frontend/src/lib/server/inventory-cards.ts`) returns `InventoryCard`s at runtime but is typed `EnhancedCardResult[]`. That mismatch is the source of the 16 svelte-check errors already on `main`, as is the `InventoryBrowser.svelte.spec.ts` fixtures lacking `deck` (6 failing tests on `main`).
 - **The inventory endpoint returns duplicates across pages.** On a real collection, `/api/inventory/cards` returned about 27% more entries across pages (`page_size=200`) than there were unique printings. This confirms the proposal's point that it pages by inventory rows. `fetchAllInventoryCards` hides it by merging on card ID. *(Both are removed since 2026-11-13.)*
