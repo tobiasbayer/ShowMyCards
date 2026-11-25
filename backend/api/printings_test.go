@@ -106,8 +106,8 @@ func TestPrintings_IncludesCrossLanguageOwnedPrintingsAndDeduplicates(t *testing
 	if status != http.StatusOK {
 		t.Fatalf("status = %d, want 200", status)
 	}
-	if source.lastQuery != "oracleid:"+fixtureBolt.oracle+" l:en" {
-		t.Errorf("query = %q, want %q", source.lastQuery, "oracleid:"+fixtureBolt.oracle+" l:en")
+	if source.lastQuery != "oracleid:"+fixtureBolt.oracle+" game:paper l:en" {
+		t.Errorf("query = %q, want %q", source.lastQuery, "oracleid:"+fixtureBolt.oracle+" game:paper l:en")
 	}
 	if source.lastOpts.UniqueMode != goscryfall.UniqueModePrints {
 		t.Errorf("UniqueMode = %q, want %q", source.lastOpts.UniqueMode, goscryfall.UniqueModePrints)
@@ -151,8 +151,8 @@ func TestPrintings_GermanViewIncludesOwnedEnglishPrinting(t *testing.T) {
 	if status != http.StatusOK {
 		t.Fatalf("status = %d, want 200", status)
 	}
-	if source.lastQuery != "oracleid:"+fixtureBolt.oracle+" l:de" {
-		t.Errorf("query = %q, want %q", source.lastQuery, "oracleid:"+fixtureBolt.oracle+" l:de")
+	if source.lastQuery != "oracleid:"+fixtureBolt.oracle+" game:paper l:de" {
+		t.Errorf("query = %q, want %q", source.lastQuery, "oracleid:"+fixtureBolt.oracle+" game:paper l:de")
 	}
 
 	var gotIDs []string
@@ -174,6 +174,10 @@ func TestPrintings_IgnoresZeroQuantityInventoryRows(t *testing.T) {
 	s.addCard(t, fixtureBolt)
 	s.addCard(t, fixtureBoltDE)
 	s.addRow(t, fixtureBoltDE, "nonfoil", 0, nil)
+	// Quantity has gorm:"default:1", so GORM replaces zero values on Create.
+	if err := s.db.Model(&models.Inventory{}).Where("scryfall_id = ?", fixtureBoltDE.id).UpdateColumn("quantity", 0).Error; err != nil {
+		t.Fatalf("failed to set zero quantity: %v", err)
+	}
 
 	status, cards := getPrintings(t, s, "/api/cards/printings/"+fixtureBolt.oracle+"?lang=en")
 	if status != http.StatusOK {
@@ -296,7 +300,7 @@ func TestPrintings_UsesSettingsDefaults(t *testing.T) {
 	if err := settingsSvc.Set(ctx, "scryfall_default_language", "de"); err != nil {
 		t.Fatalf("failed to set language setting: %v", err)
 	}
-	if err := settingsSvc.Set(ctx, "scryfall_default_search", "game:paper"); err != nil {
+	if err := settingsSvc.Set(ctx, "scryfall_default_search", "-is:digital"); err != nil {
 		t.Fatalf("failed to set default search setting: %v", err)
 	}
 
@@ -304,7 +308,7 @@ func TestPrintings_UsesSettingsDefaults(t *testing.T) {
 	if status != http.StatusOK {
 		t.Fatalf("status = %d, want 200", status)
 	}
-	want := "oracleid:" + fixtureBolt.oracle + " game:paper l:de"
+	want := "oracleid:" + fixtureBolt.oracle + " -is:digital l:de"
 	if source.lastQuery != want {
 		t.Errorf("query = %q, want %q", source.lastQuery, want)
 	}
